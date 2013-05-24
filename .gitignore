@@ -1,3 +1,7 @@
+# local archive
+save/*
+
+
 # Compiled source #
 ###################
 *.com
@@ -6,6 +10,7 @@
 *.exe
 *.o
 *.so
+tsocks
 
 # Packages #
 ############
