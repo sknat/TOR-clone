@@ -1,6 +1,10 @@
 # local archive
 save/*
+
+# sensitive data
 root-ca/private/*
+*.csr
+*.key
 
 
 # Compiled source #
