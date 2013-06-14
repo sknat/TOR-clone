@@ -52,3 +52,6 @@ basicConstraints=CA:FALSE
 subjectKeyIdentifier=hash
 authorityKeyIdentifier=keyid,issuer:always
 nsCaRevocationUrl     = https://loboto/ca-crl.pem
+
+[ crl_ext ]
+authorityKeyIdentifier=keyid:always,issuer:always

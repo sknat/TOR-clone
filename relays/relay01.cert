@@ -1,0 +1,77 @@
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number: 2 (0x2)
+    Signature Algorithm: sha1WithRSAEncryption
+        Issuer: C=FR, ST=France, L=Palaiseau, O=Loboto Inc, CN=Loboto Inc Root CA/emailAddress=relations_clientele@loboto.com
+        Validity
+            Not Before: Jun 14 13:51:35 2013 GMT
+            Not After : Jun 14 13:51:35 2014 GMT
+        Subject: C=FR, ST=France, O=Loboto Inc, OU=Relay 01, CN=Loboto/emailAddress=relay01@loboto.com
+        Subject Public Key Info:
+            Public Key Algorithm: rsaEncryption
+                Public-Key: (1024 bit)
+                Modulus:
+                    00:ee:e2:44:f3:df:4b:d3:7b:e9:3a:e3:4f:3f:f4:
+                    6a:4b:fd:5b:e8:36:6b:b0:9b:be:58:d7:13:cc:4e:
+                    74:e4:9b:55:35:d7:d6:8b:f6:9a:2e:99:12:e7:4a:
+                    5f:d4:29:bd:7b:b8:9d:e6:1b:46:43:d8:56:6c:59:
+                    31:2d:37:64:a8:20:55:bd:e1:f7:1b:4e:a9:34:e0:
+                    6d:1f:aa:cb:13:d1:6c:02:d1:67:e9:15:f4:f4:fe:
+                    6e:c4:e2:df:e6:4b:48:2f:01:64:96:8f:b6:b4:f5:
+                    1d:2d:28:28:8e:f0:00:d0:ba:69:98:d3:33:5f:63:
+                    fe:5c:c1:7a:39:bb:15:76:a5
+                Exponent: 65537 (0x10001)
+        X509v3 extensions:
+            X509v3 Basic Constraints: 
+                CA:FALSE
+            X509v3 Subject Key Identifier: 
+                42:07:24:06:E6:84:47:24:41:9E:A1:AA:7F:8C:D8:86:61:66:43:E6
+            X509v3 Authority Key Identifier: 
+                keyid:33:D5:6B:A7:0F:14:84:26:12:59:AD:48:D0:8B:BF:DA:F2:4E:B5:6F
+                DirName:/C=FR/ST=France/L=Palaiseau/O=Loboto Inc/CN=Loboto Inc Root CA/emailAddress=relations_clientele@loboto.com
+                serial:8B:F4:BB:E6:FA:A1:A2:4E
+
+            Netscape CA Revocation Url: 
+                https://loboto/ca-crl.pem
+    Signature Algorithm: sha1WithRSAEncryption
+         67:4c:92:d8:c9:48:a6:c8:3e:28:8e:7b:6e:48:8f:bc:c9:9b:
+         fb:8d:5f:b8:74:51:11:ab:82:d7:75:a8:39:78:3a:66:dc:56:
+         7d:74:f6:ec:53:95:32:9d:e4:42:b8:a3:ef:84:86:d1:d5:b4:
+         02:75:b3:d7:af:5e:39:dc:40:96:05:f4:29:e9:7e:ef:57:a0:
+         88:70:3d:c9:ab:1b:85:51:21:f2:7e:16:0a:62:ca:2a:fe:ec:
+         bf:a2:21:ba:ae:94:d7:b9:d5:51:4e:30:bc:a9:d2:bd:23:ae:
+         47:32:85:66:7c:9a:5f:19:d2:23:ad:a9:3e:da:e6:0d:a8:93:
+         8c:e0:49:e2:f6:2d:81:ce:5e:4b:59:11:bd:ff:9c:33:1a:fd:
+         51:71:7c:34:ca:57:37:a0:78:83:61:06:1b:d3:d1:ce:ef:b0:
+         12:6d:a0:6a:07:8c:a2:4e:a6:47:bb:d9:ff:ff:88:71:54:3b:
+         9c:e7:36:4f:4b:74:aa:38:00:39:23:4f:aa:2a:f1:42:8f:15:
+         53:9e:40:8f:9d:77:b0:ed:55:7e:89:61:b1:03:ea:58:6d:19:
+         f1:92:93:2d:31:f1:e2:e4:3a:1b:b5:e9:fd:d0:bc:45:16:bd:
+         1e:f5:a2:fc:fe:f4:ab:fd:98:2c:24:67:86:e3:94:ec:2d:29:
+         18:7d:b4:9c
+-----BEGIN CERTIFICATE-----
+MIIEKjCCAxKgAwIBAgIBAjANBgkqhkiG9w0BAQUFADCBkzELMAkGA1UEBhMCRlIx
+DzANBgNVBAgMBkZyYW5jZTESMBAGA1UEBwwJUGFsYWlzZWF1MRMwEQYDVQQKDApM
+b2JvdG8gSW5jMRswGQYDVQQDDBJMb2JvdG8gSW5jIFJvb3QgQ0ExLTArBgkqhkiG
+9w0BCQEWHnJlbGF0aW9uc19jbGllbnRlbGVAbG9ib3RvLmNvbTAeFw0xMzA2MTQx
+MzUxMzVaFw0xNDA2MTQxMzUxMzVaMHoxCzAJBgNVBAYTAkZSMQ8wDQYDVQQIDAZG
+cmFuY2UxEzARBgNVBAoMCkxvYm90byBJbmMxETAPBgNVBAsMCFJlbGF5IDAxMQ8w
+DQYDVQQDDAZMb2JvdG8xITAfBgkqhkiG9w0BCQEWEnJlbGF5MDFAbG9ib3RvLmNv
+bTCBnzANBgkqhkiG9w0BAQEFAAOBjQAwgYkCgYEA7uJE899L03vpOuNPP/RqS/1b
+6DZrsJu+WNcTzE505JtVNdfWi/aaLpkS50pf1Cm9e7id5htGQ9hWbFkxLTdkqCBV
+veH3G06pNOBtH6rLE9FsAtFn6RX09P5uxOLf5ktILwFklo+2tPUdLSgojvAA0Lpp
+mNMzX2P+XMF6ObsVdqUCAwEAAaOCASMwggEfMAkGA1UdEwQCMAAwHQYDVR0OBBYE
+FEIHJAbmhEckQZ6hqn+M2IZhZkPmMIHIBgNVHSMEgcAwgb2AFDPVa6cPFIQmElmt
+SNCLv9ryTrVvoYGZpIGWMIGTMQswCQYDVQQGEwJGUjEPMA0GA1UECAwGRnJhbmNl
+MRIwEAYDVQQHDAlQYWxhaXNlYXUxEzARBgNVBAoMCkxvYm90byBJbmMxGzAZBgNV
+BAMMEkxvYm90byBJbmMgUm9vdCBDQTEtMCsGCSqGSIb3DQEJARYecmVsYXRpb25z
+X2NsaWVudGVsZUBsb2JvdG8uY29tggkAi/S75vqhok4wKAYJYIZIAYb4QgEEBBsW
+GWh0dHBzOi8vbG9ib3RvL2NhLWNybC5wZW0wDQYJKoZIhvcNAQEFBQADggEBAGdM
+ktjJSKbIPiiOe25Ij7zJm/uNX7h0URGrgtd1qDl4OmbcVn109uxTlTKd5EK4o++E
+htHVtAJ1s9evXjncQJYF9Cnpfu9XoIhwPcmrG4VRIfJ+Fgpiyir+7L+iIbqulNe5
+1VFOMLyp0r0jrkcyhWZ8ml8Z0iOtqT7a5g2ok4zgSeL2LYHOXktZEb3/nDMa/VFx
+fDTKVzegeINhBhvT0c7vsBJtoGoHjKJOpke72f//iHFUO5znNk9LdKo4ADkjT6oq
+8UKPFVOeQI+dd7DtVX6JYbED6lhtGfGSky0x8eLkOhu16f3QvEUWvR71ovz+9Kv9
+mCwkZ4bjlOwtKRh9tJw=
+-----END CERTIFICATE-----
