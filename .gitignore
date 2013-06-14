@@ -2,9 +2,9 @@
 save/*
 
 # sensitive data
-root-ca/private/*
-*.csr
-*.key
+#root-ca/private/*
+#*.csr
+#*.key
 
 
 # Compiled source #
