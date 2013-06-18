@@ -1,5 +1,8 @@
 server:
-	gcc -o server server.c `pkg-config gnutls --cflags --libs`
+	gcc -o server.o server.c `pkg-config gnutls --cflags --libs`
 
 client:
-	gcc -o client client.c `pkg-config gnutls --cflags --libs`
+	gcc -o client.o client.c `pkg-config gnutls --cflags --libs`
+
+clean:
+	rm -f *.o
