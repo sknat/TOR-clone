@@ -15,7 +15,7 @@
 
 static gnutls_dh_params_t dh_params;
 
-int main (void)
+int start_router_server (void)
 {
 	int listen_sd;
 	int sd, ret, type;

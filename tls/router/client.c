@@ -13,7 +13,7 @@ extern int tcp_connect (void);
 extern void tcp_close (int sd);
 static int _verify_certificate_callback (gnutls_session_t session);
 
-int main (void) {
+int start_router_client (void) {
 	int ret, sd, ii;
 	gnutls_session_t session;
 	char buffer[MAX_BUF + 1];

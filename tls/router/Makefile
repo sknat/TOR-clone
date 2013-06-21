@@ -4,5 +4,13 @@ server:
 client:
 	gcc -o client.o client.c `pkg-config gnutls --cflags --libs`
 
+router:
+	gcc -o router.o router.c `pkg-config gnutls --cflags --libs`
+
 clean:
 	rm -f *.o
+
+run:
+	gcc -o router.o router.c `pkg-config gnutls --cflags --libs`
+	./router.o
+
