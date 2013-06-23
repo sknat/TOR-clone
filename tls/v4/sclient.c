@@ -1,5 +1,7 @@
 
-/* Sample SOCKv4 client */
+/*
+	sclient - Sample SOCKv4 client for testing purposes
+*/
 
 #include <sys/socket.h>
 #include <netinet/in.h>

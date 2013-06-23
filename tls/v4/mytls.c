@@ -10,7 +10,9 @@
 #include "config.h"
 #include "mytls.h"
 
-
+/*
+	_verify_certificate_callback - Checks the validity of the certificate during the TLS handshake.
+*/
 static int _verify_certificate_callback (gnutls_session_t session);
 gnutls_certificate_credentials_t xcred;
 
@@ -53,6 +55,7 @@ int mytls_client_session_init (uint32_t ip, uint16_t port,
 		if (ret == GNUTLS_E_INVALID_REQUEST) {
 			fprintf (stderr, "Syntax error at: %s\n", err);
 		}
+		gnutls_deinit (*session);
 		return -1;
 	}
 
@@ -70,7 +73,8 @@ int mytls_client_session_init (uint32_t ip, uint16_t port,
 
 	ret = connect (*socket_descriptor, (struct sockaddr *) &sockaddr_server, sizeof (sockaddr_server));
 	if (ret < 0) {
-		fprintf (stderr, "Impossible to connect to the relay.\n");
+		fprintf (stderr, "Impossible to connect to the peer.\n");
+		gnutls_deinit (*session);
 		return -1;
 	}
 
@@ -86,25 +90,15 @@ int mytls_client_session_init (uint32_t ip, uint16_t port,
 	if (ret < 0) {
 		fprintf (stderr, "*** Handshake failed\n");
 		gnutls_perror (ret);
-		mytls_client_end (session, *socket_descriptor);
+		close (*socket_descriptor);
+		gnutls_deinit (*session);
 		return -1;
 	}
 
 	return 0;
 }
 
-void mytls_client_end (gnutls_session_t *session, int socket_descriptor)
-{
-	close (socket_descriptor);
-	gnutls_deinit (*session);
-	gnutls_certificate_free_credentials (xcred);
-	gnutls_global_deinit ();
-}
 
-/*
-	This function will verify the peer's certificate, as well as the
-	activation, expiration dates.
- */
 static int _verify_certificate_callback (gnutls_session_t session) {
 	unsigned int status;
 	int ret, type;

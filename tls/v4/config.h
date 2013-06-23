@@ -1,3 +1,7 @@
+/*
+	config.h - Global parameters
+*/
+
 #ifndef CONFIG
 #define CONFIG
 

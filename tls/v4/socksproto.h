@@ -1,3 +1,8 @@
+/*
+	socketproto - Definitions about the SOCKSv4 protocol.
+*/
+
+
 #ifndef SOCKS_PROTO
 #define SOCKS_PROTO
 
