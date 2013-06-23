@@ -1,5 +1,6 @@
 # local archive
 save/*
+*~
 
 # sensitive data
 #root-ca/private/*
