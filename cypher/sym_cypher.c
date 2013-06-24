@@ -1,3 +1,9 @@
+/*******************************************************************************
+
+	Library for a simple use of gcrypt - symmetric cyphering
+	Modified form the example by Jason Lewis
+
+*******************************************************************************/
 #include <stdio.h>
 #include <gcrypt.h>
 
@@ -10,6 +16,13 @@ char * iniVector;
 
 void aesInit(char * aesSymKey, char * _iniVector)
 {
+	/* Version check should be the very first call because it
+	makes sure that important subsystems are intialized. */
+	if (!gcry_check_version (GCRYPT_VERSION))
+	{
+		fputs ("libgcrypt version mismatch\n", stderr);
+		exit (2);
+	}
 	size_t keyLength = gcry_cipher_get_algo_keylen(GCRY_CIPHER);
 	size_t blkLength = gcry_cipher_get_algo_blklen(GCRY_CIPHER);
     gcry_error_t     gcryError;
@@ -59,29 +72,3 @@ void aesClose()
     gcry_cipher_close(gcryCipherHd);
 }
 
-void main()
-{
-	/* Version check should be the very first call because it
-	makes sure that important subsystems are intialized. */
-	if (!gcry_check_version (GCRYPT_VERSION))
-	{
-		fputs ("libgcrypt version mismatch\n", stderr);
-		exit (2);
-	}
-	
-char * txtb = "123456789123456";
-size_t txtLength = strlen(txtb)+1;//String + Termination
-printf("input text = %s\n", txtb);
-printf("text length = %d\n", txtLength);
-	aesInit("one test AES keyone test AES key", "a test ini value");
-	aesEncrypt(txtb,txtLength);
-int index;
-printf("encBuffer = ");
-for (index = 0; index<txtLength; index++)
-    printf("%02X", (unsigned char)txtb[index]);
-printf("\n");
-	aesInit("one test AES keyone test AES key", "a test ini value");
-	aesDecrypt(txtb,txtLength);
-printf("decoded = %s\n", txtb);
-	aesClose();
-}
