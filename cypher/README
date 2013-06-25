@@ -1,6 +1,3 @@
 The documentation Source for the Cipher Library
 
 http://www.gnupg.org/documentation/manuals/gcrypt/index.html
-
-Example.c :: source found on a forum, implementing the basics of the library.
-This file has been modified and adapted in cypher.c to make an usable library
