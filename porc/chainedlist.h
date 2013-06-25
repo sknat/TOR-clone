@@ -42,7 +42,7 @@ typedef struct ITEM_SOCKS_SESSION
 {
 	int id_prev;			// PORC client's id for the SOCKS session
 	int client_porc_session;	// PORC session used to communicate with the client
-	int target_socket_descriptor;	// if type=SOCKS_TO_TARGET
+	int target_socket_descriptor;
 } 	ITEM_SOCKS_SESSION;
 
 

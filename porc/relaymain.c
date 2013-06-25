@@ -98,21 +98,19 @@ int set_fds (int *nfds, fd_set *fds) {
 
 	FD_ZERO (fds);
 
-	for (c=porc_session_list.first; c!=NULL; c=c->nxt) {
-		FD_SET (((ITEM_PORC_SESSION*)(c->item))->socket_descriptor, fds);
+	for (c=tls_session_list.first; c!=NULL; c=c->nxt) {
+		FD_SET (((ITEM_TLS_SESSION*)(c->item))->socket_descriptor, fds);
 		n++;
-		if (((ITEM_PORC_SESSION*)(c->item))->socket_descriptor > max) {
-			max = ((ITEM_PORC_SESSION*)(c->item))->socket_descriptor;
+		if (((ITEM_TLS_SESSION*)(c->item))->socket_descriptor > max) {
+			max = ((ITEM_TLS_SESSION*)(c->item))->socket_descriptor;
 		}
 	}
 
 	for (c=socks_session_list.first; c!=NULL; c=c->nxt) {
-		if (((ITEM_SOCKS_SESSION*)(c->item))->type == SOCKS_TO_TARGET) {
-			FD_SET (((ITEM_SOCKS_SESSION*)(c->item))->target_socket_descriptor, fds);
-			n++;
-			if (((ITEM_SOCKS_SESSION*)(c->item))->target_socket_descriptor > max) {
-				max = ((ITEM_SOCKS_SESSION*)(c->item))->target_socket_descriptor;
-			}
+		FD_SET (((ITEM_SOCKS_SESSION*)(c->item))->target_socket_descriptor, fds);
+		n++;
+		if (((ITEM_SOCKS_SESSION*)(c->item))->target_socket_descriptor > max) {
+			max = ((ITEM_SOCKS_SESSION*)(c->item))->target_socket_descriptor;
 		}
 	}
 
@@ -122,12 +120,80 @@ int set_fds (int *nfds, fd_set *fds) {
 
 
 
-int process_order(char *buffer, int n, int porc_session_id) {
-	return 0;
+int process_tor_packet(char *buffer, int n, int tls_session_id) {
+	// Read the number of bytes
+	int length;
+	if (gnutls_record_recv (session, (char *)&length, sizeof(length))
+		!= sizeof (length))
+	{
+		fprintf (stderr, "Impossible to read the length of the PORC packet\n");
+		return -1;
+	}
+
+	// Read the remainder of the packet
+	char *buffer = malloc (length-sizeof(length));
+	if (gnutls_record_recv (session, buffer, length-sizeof(length))
+		!= length-sizeof (length))
+	{
+		fprintf (stderr, "Impossible to read the PORC packet\n");
+		return -1;
+	}
+
+	int direction = ((int *)buffer)[0];		// Read the direction
+	int porc_id = ((int *)buffer)[1];		// Read the PORC session
+
+	int sock_session_id;
+	ITEM_SOCKS_SESSION sock_session;
+	if (direction == PORC_DIRECTION_DOWN) {
+		// We must decode
+
+		CHAINED_LIST_LINK *c;
+		for (c=socks_session_list.first; c!=NULL; c=c->nxt) {
+			if ((((ITEM_SOCKS_SESSION*)(c->item))->id_prev == porc_id_prev)) &&
+				(((ITEM_SOCKS_SESSION*)(c->item))->client_tls_session == tls_session_id))
+			{
+				sock_session_id = c->id;
+				sock_session = (ITEM_SOCKS_SESSION *)(c->item);
+
+				if (sock_session->final == 0) {
+					// Decode and send to the next relay
+					decodage(buffer+2*sizeof(int), ...);
+
+				} else {
+					// Decode and read the command
+				}
+				return 0;
+			}
+		}
+	} else if (direction == PORC_DIRECTION_UP) {
+		// We must encode
+
+		CHAINED_LIST_LINK *c;
+		for (c=socks_session_list.first; c!=NULL; c=c->nxt) {
+			if ((c->id == porc_id)) &&
+				(((ITEM_SOCKS_SESSION*)(c->item))->server_tls_session == tls_session_id))
+			{
+				sock_session_id = c->id;
+				sock_session = (ITEM_SOCKS_SESSION *)(c->item);
+
+				// Encode and send to the previous relay
+
+				return 0
+			}
+		}
+	} else {
+		fprintf (stderr, "Incorrect direction\n");
+		return -1;
+	}
+
+	fprintf (stderr, "Incorrect PORC session.\n");
+	return -1;
 }
 
-
 int send_to_porc(char *buffer, int n, int socks_session_id) {
+
+
+
 	return 0;
 }
 
@@ -156,35 +222,33 @@ int selecting() {
 
 		while((nbr = pselect(nfds, &read_fds, 0, 0, 0, &signal_set)) > 0) {
 			for (c=porc_session_list.first; c!=NULL; c=c->nxt) {
-				if (FD_ISSET (((ITEM_PORC_SESSION*)(c->item))->socket_descriptor, &read_fds)) {
-					int recvd = recv(((ITEM_PORC_SESSION*)(c->item))->socket_descriptor, buffer, BUF_SIZE, 0);
+				if (FD_ISSET (((ITEM_TLS_SESSION *)(c->item))->socket_descriptor, &read_fds)) {
+					int recvd = recv(((ITEM_TLS_SESSION *)(c->item))->socket_descriptor, buffer, BUF_SIZE, 0);
 					if(recvd <= 0) {
 						fprintf (stderr, "Stop (100), %d\n", c->id);
 						return -1;
 					}
 					buffer [recvd] = '\0';
 					printf ("Receiving from client (%d bytes) : %s\n", recvd, buffer);
-					if (process_order(buffer, recvd, c->id)!=0) {
+					if (process_porc_packet(buffer, recvd, c->id)!=0) {
 						fprintf (stderr, "Stop (250), %d\n", c->id);
 						return -1;
 					}
 				}
 			}
 			for (c=socks_session_list.first; c!=NULL; c=c->nxt) {
-				if (((ITEM_SOCKS_SESSION*)(c->item))->type == SOCKS_TO_TARGET) {
-					if (FD_ISSET (((ITEM_SOCKS_SESSION*)(c->item))->target_socket_descriptor, &read_fds)) {
-						int recvd = recv(((ITEM_SOCKS_SESSION*)(c->item))->target_socket_descriptor,
-							buffer, BUF_SIZE, 0);
-						if(recvd <= 0) {
-							fprintf (stderr, "Stop (120), %d\n", c->id);
-							return -1;
-						}
-						buffer [recvd] = '\0';
-						printf ("Receiving from target (%d bytes) : %s\n", recvd, buffer);
-						if (send_to_porc(buffer, recvd, c->id)!=0) {
-							fprintf (stderr, "Stop (270), %d\n", c->id);
-							return -1;
-						}
+				if (FD_ISSET (((ITEM_SOCKS_SESSION*)(c->item))->target_socket_descriptor, &read_fds)) {
+					int recvd = recv(((ITEM_SOCKS_SESSION*)(c->item))->target_socket_descriptor,
+						buffer, BUF_SIZE, 0);
+					if(recvd <= 0) {
+						fprintf (stderr, "Stop (120), %d\n", c->id);
+						return -1;
+					}
+					buffer [recvd] = '\0';
+					printf ("Receiving from target (%d bytes) : %s\n", recvd, buffer);
+					if (send_to_porc(buffer, recvd, c->id)!=0) {
+						fprintf (stderr, "Stop (270), %d\n", c->id);
+						return -1;
 					}
 				}
 			}
