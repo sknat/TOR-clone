@@ -24,11 +24,13 @@ typedef struct ITEM_TLS_SESSION
 } 	ITEM_TLS_SESSION;
 
 
-// id is the local PORC peer id for the PORC connection
 typedef struct ITEM_PORC_SESSION
 {
-	int tls_session;
+	int id_prev;			// PORC client's id for the PORC session
+	int client_tls_session;
 	char sym_key[32];
+	int final;			// set if the relay is the final relay (then server_tls_session undefined)
+	int server_tls_session;
 } 	ITEM_PORC_SESSION;
 
 
@@ -40,9 +42,7 @@ typedef struct ITEM_SOCKS_SESSION
 {
 	int id_prev;			// PORC client's id for the SOCKS session
 	int client_porc_session;	// PORC session used to communicate with the client
-	int type;	// SOCKS_TO_TARGET if the destination is a extern server, SOCKS_TO_RELAY if the destination is a PORC relay
 	int target_socket_descriptor;	// if type=SOCKS_TO_TARGET
-	int server_porc_session;	// if type=SOCKS_TO_RELAY
 } 	ITEM_SOCKS_SESSION;
 
 
