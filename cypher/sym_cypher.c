@@ -46,16 +46,30 @@ void aesSetKey(char * aesSymKey, char * aesIniVector)
 	keyRemind = aesSymKey;
 }
 
-void aesEncrypt(char * txtBuffer)
+int aesEncrypt(char * txtBuffer, size_t txtBufferLen)
 {
+	//First 4Bytes of the Buffer describes the size of the data
+	int n = ((4+txtBufferLen)/blkLength+1)*blkLength;
+	char * outBuffer = malloc(n);
+	((size_t*) outBuffer)[0]=txtBufferLen;
+	snprintf(outBuffer+5,n-4,"%s",txtBuffer);
+	memset(outBuffer+5+txtBufferLen,'a',n-4-txtBufferLen);
+
 	gcry_cipher_setiv(gcryCipherHd, iniVector, blkLength);
-    if (gcry_cipher_encrypt(gcryCipherHd, txtBuffer, strlen(txtBuffer), NULL, 0)) die("gcry_cipher_encrypt failed");
+    if (gcry_cipher_encrypt(gcryCipherHd, outBuffer, n, NULL, 0)) die("gcry_cipher_encrypt failed");
+	memcpy(txtBuffer,outBuffer,n);
+	return n;
 }
  
- void aesDecrypt(char * txtBuffer)
+ void aesDecrypt(char * txtBuffer, size_t txtBufferLen)
 {
 	gcry_cipher_setiv(gcryCipherHd, iniVector, blkLength);
-    if (gcry_cipher_decrypt(gcryCipherHd, txtBuffer, strlen(txtBuffer), NULL, 0)) die("gcry_cipher_decrypt failed");
+    if (gcry_cipher_decrypt(gcryCipherHd, txtBuffer, txtBufferLen, NULL, 0)) die("gcry_cipher_decrypt failed");
+	
+	size_t realLen = ((size_t*) txtBuffer)[0];
+	char * outBuffer = malloc(realLen);
+	memcpy (outBuffer,txtBuffer+5,realLen);
+	strcpy(txtBuffer,outBuffer);
 }
 
 void aesClose()

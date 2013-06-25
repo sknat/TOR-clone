@@ -13,14 +13,14 @@
 #include "utils.c"
 
 void main()
-{	
+{		
 	/***************************************/
 	// Testing symmetric cryptography
 	/***************************************/
 
 	int index;
 	//String + Termination must be a multiple of 16 (blocksize) in length
-	char * txtb = "1234DBqsdjkcfhskdj?D?N31njhjb123";
+	char * txtb = "1234DBqjhszfjsdbfksjdbksdvsdbvjssdjhkjkjkjknkcfhskdj?D?N31njhjb123";
 	printf("Input    text = %s\n", txtb);
 	printf("Input  length = %d\n", strlen(txtb));
 	printf("Input    text = ");
@@ -37,7 +37,7 @@ void main()
 	//printf("Exported Key = %s\n", tmpkkk);
 	aesImportKey(tmpkkk);
 	
-	aesEncrypt(txtb);
+	int n = aesEncrypt(txtb,strlen(txtb));
 	
 	printf("Encoded  text = ");
 	for (index = 0; index<strlen(txtb); index++)
@@ -45,10 +45,11 @@ void main()
 	printf("\n");
 	printf("Encoded length = %d\n", strlen(txtb));
 
-	aesDecrypt(txtb);
+	aesDecrypt(txtb,n);
 	printf("Decoded  text = %s\n", txtb);
 	
 	aesClose();
+	printf("------------------------------------------\n");
 	/***************************************/
 	// Testing asymmetric cryptography
 	/***************************************/
