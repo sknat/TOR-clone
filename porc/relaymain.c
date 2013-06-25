@@ -11,8 +11,8 @@ static gnutls_priority_t priority_cache;
 pthread_t accepting_thread;
 pthread_t selecting_thread;
 
-gcry_sexp_t * publicKey; 
-gcry_sexp_t * privateKey;
+gcry_sexp_t publicKey; 
+gcry_sexp_t privateKey;
 
 
 CHAINED_LIST tls_session_list;
@@ -71,7 +71,7 @@ int handle_connection(int client_socket_descriptor) {
 	//Send public Key
 	PUB_KEY_RESPONSE pub_key_response;
 	char * export_pub_key = malloc(PUBLIC_KEY_LEN);
-	if (rsaExportKey(publicKey, export_pub_key)!=0)
+	if (rsaExportKey(&publicKey, export_pub_key)!=0)
 	{
 		fprintf (stderr, "Error exporting public key (router)\n");
 		return -1;
@@ -90,7 +90,7 @@ int handle_connection(int client_socket_descriptor) {
 	if (gnutls_record_recv (session, (char *)&crypt_sym_key_response, 
 		sizeof (crypt_sym_key_response)) != sizeof (crypt_sym_key_response)) 
 	{
-		fprintf (stderr, "Error while awaiting symmetric key (router)\n");
+		fprintf (stderr, "Error while awaiting symmetric key (router) size=%i\n",sizeof (crypt_sym_key_response));
 		return -1;	
 	}
 	if (crypt_sym_key_response.status != CRYPT_SYM_KEY_SUCCESS)
@@ -104,7 +104,7 @@ int handle_connection(int client_socket_descriptor) {
 	int id_porc_session;
 
 	id_porc_session = ChainedListNew (&porc_session_list, (void *)&porc_session, sizeof(ITEM_PORC_SESSION));
-	if (rsaDecrypt(crypt_sym_key_response.crypt_sym_key, porc_session->sym_key, *privateKey)!=0)
+	if (rsaDecrypt(crypt_sym_key_response.crypt_sym_key, porc_session->sym_key, privateKey)!=0)
 	{
 		fprintf (stderr, "Error decrypting symmetric key\n");
 		return -1;
@@ -348,8 +348,8 @@ int main (int argc, char **argv)
 		fprintf(stderr, "Error initializing RSA\n");
 		return -1;
 	}
-	
-	if (rsaGenKey(publicKey, privateKey)!=0) 
+
+	if (rsaGenKey(&publicKey, &privateKey)!=0) 
 	{
 		fprintf(stderr, "Error initializing RSA Keys\n");
 		return -1;
@@ -359,6 +359,7 @@ int main (int argc, char **argv)
 		fprintf (stderr, "Incorrect number of argument : you must define a port to listen to\n");
 		return -1;
 	}
+
 	port = atoi (argv[1]);
 
 	if ((ret=signal_init()) != 0) {
