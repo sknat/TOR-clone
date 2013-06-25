@@ -24,5 +24,8 @@
 #define MAXPENDING 200
 #define BUF_SIZE 256
 
+#define PUBLIC_KEY_LEN 565
+#define CRYPT_SYM_KEY_LEN 547
+
 
 #endif

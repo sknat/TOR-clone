@@ -57,7 +57,7 @@ void main()
 	gcry_sexp_t ppkey;
 	gcry_sexp_t skey;
 	
-	char * txt = "123456789123456abcde";
+	char * txt = keyRemind;
 	char * out = malloc(MAX);
 	char * ret = malloc(MAX);
 	char * tmpk = malloc(MAX);
@@ -70,7 +70,9 @@ void main()
 	printf("%s\n",txt);
 	rsaEncrypt(txt, out, pkey);
 	printf("----------------\n%s\n---------------\n",tmpk);
+	printf("keylen--%i\n",strlen(tmpk));
 	printf("----------------\n%s\n---------------\n",out);
+	printf("enclen--%i\n",strlen(out));
 	rsaDecrypt(out,ret,skey);
 	printf("%s\n",ret);
 	

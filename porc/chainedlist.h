@@ -17,13 +17,18 @@ typedef struct ITEM_CLIENT
 } 	ITEM_CLIENT;
 
 
+typedef struct ITEM_TLS_SESSION
+{
+	int socket_descriptor;
+	gnutls_session_t session;
+} 	ITEM_TLS_SESSION;
+
 
 // id is the local PORC peer id for the PORC connection
 typedef struct ITEM_PORC_SESSION
 {
-	int socket_descriptor;
-	gnutls_session_t session;
-	// TODO : keys
+	int tls_session;
+	char sym_key[32];
 } 	ITEM_PORC_SESSION;
 
 

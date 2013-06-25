@@ -29,7 +29,7 @@ extern MYSOCKET *list_relays;
 /*
 	DIRECTORY_REQUEST - Request for the list of the trusted relays.
 */
-#define DIRECTORY_ASK	65
+#define DIRECTORY_ASK 65
 typedef struct DIRECTORY_REQUEST {
 	uint8_t command;
 } __attribute__((packed))	DIRECTORY_REQUEST;
@@ -55,9 +55,27 @@ typedef uint8_t PORC_COMMAND;
 #define PORC_ACK_CONNECT_TARGET		210	// Asks the last PORC relay to join a extern target
 typedef uint8_t PORC_ACK;
 
+/*
+	Porc Handshake for symmetric cryptography
+*/
+#define PUB_KEY_ASK 66
+typedef struct PUB_KEY_REQUEST {
+	uint8_t command;
+} __attribute__((packed))	DIRECTORY_REQUEST;
 
+#define PUB_KEY_SUCCESS 0
+#define PUB_KEY_FAILURE 1
+typedef struct PUB_KEY_RESPONSE {
+	uint8_t status;
+	char public_key[PUBLIC_KEY_LEN];
+} __attribute__((packed))	DIRECTORY_REQUEST;
 
-
+#define CRYPT_SYM_KEY_SUCCESS 0
+#define CRYPT_SYM_KEY_FAILURE 1
+typedef struct CRYPT_SYM_KEY_RESPONSE {
+	uint8_t status;
+	char crypt_sym_key[CRYPT_SYM_KEY_LEN];
+} __attribute__((packed)) DIRECTORY_REQUEST;
 
 /*
 	gnutls_global_init must have been called prior to thiese functions

@@ -13,7 +13,7 @@ void main()
 {	
 	rsaInit();
 	//Ask for public key of next node
-//ASK
+//SEND
 	//Wait for Public key
 	char * rawRouterPublicKey = malloc(MAX);
 //GET rawRouterPublicKey
@@ -29,9 +29,6 @@ void main()
 	gcry_sexp_release(routerPublicKey);
 	//Send Encripted SymmetricKey
 //SEND cryptClientSymKey
-	//Wait for Handshake
-	char * rawRouterHSK = malloc(MAX);
-//GET rawRouterHSK
 	//Decrypt handshake (symmetricKey)
 	aesDecrypt(rawRouterHSK);
 	//Tunnel is open
