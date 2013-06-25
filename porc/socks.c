@@ -108,7 +108,7 @@ int proxy_socksv4 (int port) {
 	struct sockaddr_in sockaddr_client;
 	int listen_socket_descriptor;
 	int client_socket_descriptor;
-	int length = sizeof(sockaddr_client);
+	socklen_t length = sizeof(sockaddr_client);
 
 	listen_socket_descriptor = create_listen_socket(port);
 	if(listen_socket_descriptor == -1) {
