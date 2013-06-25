@@ -52,8 +52,8 @@ int aesEncrypt(char * txtBuffer, size_t txtBufferLen)
 	int n = ((4+txtBufferLen)/blkLength+1)*blkLength;
 	char * outBuffer = malloc(n);
 	((size_t*) outBuffer)[0]=txtBufferLen;
-	snprintf(outBuffer+5,n-4,"%s",txtBuffer);
-	memset(outBuffer+5+txtBufferLen,'a',n-4-txtBufferLen);
+	memcpy(outBuffer+4,txtBuffer,n-4);
+	memset(outBuffer+4+txtBufferLen,'a',n-4-txtBufferLen);
 
 	gcry_cipher_setiv(gcryCipherHd, iniVector, blkLength);
     if (gcry_cipher_encrypt(gcryCipherHd, outBuffer, n, NULL, 0)) die("gcry_cipher_encrypt failed");
@@ -68,7 +68,7 @@ int aesEncrypt(char * txtBuffer, size_t txtBufferLen)
 	
 	size_t realLen = ((size_t*) txtBuffer)[0];
 	char * outBuffer = malloc(realLen);
-	memcpy (outBuffer,txtBuffer+5,realLen);
+	memcpy (outBuffer,txtBuffer+4,realLen);
 	strcpy(txtBuffer,outBuffer);
 	return realLen;
 }
