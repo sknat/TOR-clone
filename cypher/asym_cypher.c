@@ -1,16 +1,15 @@
- 
+ /*******************************************************************************
+
+	Library for a simple use of gcrypt - asymmetric cyphering
+
+*******************************************************************************/
+
 #include <stdio.h>
 #include <gcrypt.h>
  
 #define OUT_MODE GCRYSEXP_FMT_ADVANCED
-
-void die(char * str)
-{
-	printf("%s\n", str);
-	exit(2);
-} 
  
-void generateKeys(gcry_sexp_t * publicKey, gcry_sexp_t * privateKey)
+void rsaGenKey(gcry_sexp_t * publicKey, gcry_sexp_t * privateKey)
 {
 	gcry_sexp_t key_specification;
 	gcry_sexp_t key;
@@ -26,15 +25,15 @@ void generateKeys(gcry_sexp_t * publicKey, gcry_sexp_t * privateKey)
 	gcry_sexp_release(key);
 }
 
-void importKey(char * inBuffer, gcry_sexp_t * key)
+void rsaImportKey(char * inBuffer, gcry_sexp_t * key)
 {
 	if(gcry_sexp_new(key, inBuffer, strlen(inBuffer), 1)) die("Failed to import key");
 }
 
-void exportKey(gcry_sexp_t * key, char * outBuffer)
+void rsaExportKey(gcry_sexp_t * key, char * outBuffer)
 {
 	if(!(gcry_sexp_sprint(*key, OUT_MODE, outBuffer, gcry_sexp_sprint(*key, OUT_MODE, NULL, 0)))) 
-		die("Error while printing encrypted result");
+		die("Error while exporting key");
 }
  
 void rsaEncrypt(char * inBuffer, char * outBuffer, gcry_sexp_t publicKey) 
@@ -67,6 +66,15 @@ void rsaDecrypt(char * inBuffer, char * outBuffer, gcry_sexp_t privateKey)
 	if(gcry_pk_decrypt(&plain_sexp, crypt_sexp, privateKey)) die("Error during the decryption");
 	if(!(gcry_sexp_sprint(plain_sexp, OUT_MODE, outBuffer, strlen(inBuffer)))) die("Error while printing decryption result");
 
+	//removing quotes left by the S-Expression translation
+	int i;
+	int n = strlen(outBuffer)-4;
+	for (i = 0;i<n; i++)
+	{
+		outBuffer[i]=outBuffer[i+1];
+	}
+	outBuffer[n]='\0';
+	
 	gcry_sexp_release(crypt_sexp);
 	gcry_sexp_release(plain_sexp);
 }
@@ -80,29 +88,4 @@ void rsaInit()
 	gcry_control( GCRYCTL_DISABLE_SECMEM ); //No secure memory
 	gcry_control( GCRYCTL_ENABLE_QUICK_RANDOM, 0 );
 }
-/*
-void main()
-{ 
-	gcry_sexp_t pkey;
-	gcry_sexp_t ppkey;
-	gcry_sexp_t skey;
-	
-	char * txt = "123456789123456";
-	char * out = malloc(1000);
-	char * ret = malloc(1000);
-	char * tmpk = malloc(1000);
-	rsaInit();
-	generateKeys(&pkey, &skey);
-	exportKey(&pkey, tmpk);
-	importKey(tmpk, &ppkey);
-	
-	printf("%s\n",txt);
-	rsaEncrypt(txt, out, ppkey);
-	printf("----------------\n%s\n---------------\n",tmpk);
-	rsaDecrypt(out,ret,skey);
-	printf("%s\n",ret);
-	
-    gcry_sexp_release(skey);
-	gcry_sexp_release(pkey);
-}*/
 

@@ -9,62 +9,53 @@
 
 #define GCRY_CIPHER GCRY_CIPHER_AES256   // Pick the cipher here
 #define GCRY_CIPHER_MODE GCRY_CIPHER_MODE_CBC
-size_t keyLength, blkLength;
+
 
 gcry_cipher_hd_t gcryCipherHd;
+char * keyRemind;
 char * iniVector;
+size_t keyLength;
+size_t blkLength;
 
-void aesInit(char * aesSymKey, char * _iniVector)
+
+void aesInit()
 {
 	/* Version check should be the very first call because it
 	makes sure that important subsystems are intialized. */
-	if (!gcry_check_version (GCRYPT_VERSION))
-	{
-		fputs ("libgcrypt version mismatch\n", stderr);
-		exit (2);
-	}
-	size_t keyLength = gcry_cipher_get_algo_keylen(GCRY_CIPHER);
-	size_t blkLength = gcry_cipher_get_algo_blklen(GCRY_CIPHER);
-    gcry_error_t     gcryError;
-	iniVector = _iniVector;
-    gcryError = gcry_cipher_open(
-        &gcryCipherHd, // gcry_cipher_hd_t *
-        GCRY_CIPHER,   // int
-        GCRY_CIPHER_MODE,     // int
-        0);            // unsigned int
-    if (gcryError)
-    {
-        printf("gcry_cipher_open failed:  %s/%s\n", gcry_strsource(gcryError), gcry_strerror(gcryError));
-        return;
-    }
-	gcryError = gcry_cipher_setkey(gcryCipherHd, aesSymKey, keyLength);
-    if (gcryError)
-    {
-        printf("gcry_cipher_setkey failed:  %s/%s\n", gcry_strsource(gcryError), gcry_strerror(gcryError));
-        return;
-    }
+	if (!gcry_check_version (GCRYPT_VERSION)) die ("libgcrypt version mismatch");
+	gcry_control( GCRYCTL_ENABLE_QUICK_RANDOM, 0 );
+	
+	keyLength = gcry_cipher_get_algo_keylen(GCRY_CIPHER);
+	blkLength = gcry_cipher_get_algo_blklen(GCRY_CIPHER);
+    if (gcry_cipher_open(&gcryCipherHd, GCRY_CIPHER, GCRY_CIPHER_MODE, 0)) die ("gcry_cipher_open failed");
 }
 
-void aesEncrypt(char * txtBuffer, size_t txtLength)
+void aesGenKey()
+{	
+	iniVector = malloc(blkLength);
+	keyRemind = malloc(keyLength);
+	gcry_randomize(iniVector,blkLength,GCRY_STRONG_RANDOM);
+	gcry_randomize(keyRemind,keyLength,GCRY_VERY_STRONG_RANDOM);
+    if (gcry_cipher_setkey(gcryCipherHd, keyRemind, keyLength)) die ("gcry_cipher_setkey failed");
+}
+
+void aesSetKey(char * aesSymKey, char * aesIniVector)
+{	
+    if (gcry_cipher_setkey(gcryCipherHd, keyRemind, keyLength)) die ("gcry_cipher_setkey failed");
+	iniVector = aesIniVector;
+	keyRemind = aesSymKey;
+}
+
+void aesEncrypt(char * txtBuffer)
 {
-	gcry_error_t     gcryError;
-	gcryError = gcry_cipher_encrypt(gcryCipherHd, txtBuffer, txtLength, NULL, 0);
-    if (gcryError)
-    {
-        printf("gcry_cipher_encrypt failed:  %s/%s\n", gcry_strsource(gcryError), gcry_strerror(gcryError));
-        return;
-    }
+	gcry_cipher_setiv(gcryCipherHd, iniVector, blkLength);
+    if (gcry_cipher_encrypt(gcryCipherHd, txtBuffer, strlen(txtBuffer), NULL, 0)) die("gcry_cipher_encrypt failed");
 }
  
- void aesDecrypt(char * txtBuffer, size_t txtLength)
+ void aesDecrypt(char * txtBuffer)
 {
-	gcry_error_t     gcryError;	
-	gcryError = gcry_cipher_decrypt(gcryCipherHd, txtBuffer, txtLength, NULL, 0);
-    if (gcryError)
-    {
-        printf("gcry_cipher_decrypt failed:  %s/%s\n", gcry_strsource(gcryError), gcry_strerror(gcryError));
-        return;
-    }
+	gcry_cipher_setiv(gcryCipherHd, iniVector, blkLength);
+    if (gcry_cipher_decrypt(gcryCipherHd, txtBuffer, strlen(txtBuffer), NULL, 0)) die("gcry_cipher_decrypt failed");
 }
 
 void aesClose()
@@ -72,3 +63,20 @@ void aesClose()
     gcry_cipher_close(gcryCipherHd);
 }
 
+void aesImportKey(char * txtBuffer)
+{
+	keyRemind = malloc(keyLength);
+	iniVector = malloc(blkLength);
+	int i;
+	for(i = 0;i<strlen(txtBuffer);i++)
+	{
+		if (i<keyLength) keyRemind[i] = txtBuffer[i];
+		else iniVector[i-keyLength] = txtBuffer[i];
+	}
+    if (gcry_cipher_setkey(gcryCipherHd, keyRemind, keyLength)) die ("gcry_cipher_setkey failed");
+}
+
+void aesExportKey(char * txtBuffer)
+{
+	snprintf(txtBuffer, keyLength+blkLength, "%s%s", keyRemind, iniVector);
+}
