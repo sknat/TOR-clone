@@ -26,8 +26,8 @@ extern MYSOCKET *list_relays;
 /*
 	gnutls_global_init must have been called prior to thiese functions
 */
-int client_circuit_init ();
-int client_circuit_free ();
+extern int client_circuit_init ();
+extern int client_circuit_free ();
 
 #endif
 

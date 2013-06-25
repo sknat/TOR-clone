@@ -3,19 +3,14 @@
 int nbr_relays = 0;
 MYSOCKET *list_relays = NULL;
 
-
-
 int client_circuit_init () {
 	int socket_descriptor;
-	int ret;
 	gnutls_session_t session;
 	DIRECTORY_REQUEST directory_request;
 	DIRECTORY_RESPONSE directory_response;
 
 	// Ask for the relay list to the PORC directory
-
-	ret = mytls_client_session_init (inet_addr(DIRECTORY_IP), htons(DIRECTORY_PORT), &session, &socket_descriptor);
-	if (ret < 0) {
+	if (mytls_client_session_init (inet_addr(DIRECTORY_IP), htons(DIRECTORY_PORT), &session, &socket_descriptor) < 0) {
 		fprintf (stderr, "Error joining directory\n");
 		return -1;
 	}
@@ -48,6 +43,7 @@ int client_circuit_init () {
 	if (nbr_relays != 0) {
 		free (list_relays);
 	}
+	
 	nbr_relays = directory_response.nbr;
 	list_relays = (void *)malloc(sizeof(MYSOCKET)*nbr_relays);
 
@@ -75,9 +71,9 @@ int client_circuit_init () {
 	client_circuit.relay1.ip = list_relays[r].ip;
 	client_circuit.relay1.port = list_relays[r].port;
 
-	ret = mytls_client_session_init (client_circuit.relay1.ip, client_circuit.relay1.port,
-		 &(client_circuit.session), (&client_circuit.relay1_socket_descriptor));
-	if (ret < 0) {
+	if (mytls_client_session_init (client_circuit.relay1.ip, client_circuit.relay1.port,
+		 &(client_circuit.session), (&client_circuit.relay1_socket_descriptor)) < 0) 
+	{
 		fprintf (stderr, "Error joining 1st relay\n");
 		return -1;
 	}
@@ -132,7 +128,7 @@ int client_circuit_init () {
 		gnutls_deinit (client_circuit.session);
 		return -1;	
 	}
-
+	
 	if (gnutls_record_recv (session, (char *)&porc_ack, sizeof (porc_ack))
 		!= sizeof (porc_ack))
 	{

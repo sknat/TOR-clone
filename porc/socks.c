@@ -63,7 +63,6 @@ int handle_connection(int client_socket_descriptor) {
 	SOCKS4RequestHeader header;
 	SOCKS4IP4RequestBody req;
 	SOCKS4Response response;
-	int ret;
 
 	recv(client_socket_descriptor, (char*)&header, sizeof(SOCKS4RequestHeader), 0);
 	if(header.version != 4 || header.cmd != CMD_CONNECT) {
@@ -79,8 +78,7 @@ int handle_connection(int client_socket_descriptor) {
 			return -1;}
 	}
 
-	ret = new_client (client_socket_descriptor, req.ip_dst, ntohs(req.port));
-	if (ret == -1) {
+	if (new_client (client_socket_descriptor, req.ip_dst, ntohs(req.port)) == -1) {
 		fprintf (stderr, "Failed to connect to target.\n");
 		return -1;
 	}
@@ -89,16 +87,17 @@ int handle_connection(int client_socket_descriptor) {
 	response.status=RESP_SUCCEDED;
 	response.rsv1=0;
 	response.rsv2=0;
-	ret = send(client_socket_descriptor, (const char*)&response, sizeof(SOCKS4Response), 0);
-	if (ret != sizeof(SOCKS4Response)) {
-		fprintf (stderr, "Error in response (%d)\n", ret);
+
+	if (send(client_socket_descriptor, (const char*)&response, sizeof(SOCKS4Response), 0)
+		!= sizeof(SOCKS4Response)) 
+	{
+		fprintf (stderr, "Error in response\n");
 		return -1;
 	}
 
 	// Signaling a new available socket to the selecting thread
-	ret = pthread_kill (selecting_thread, SIGUSR1);
-	if (ret != 0) {
-		fprintf (stderr, "Signal sending failed (%d)\n", ret);
+	if (pthread_kill (selecting_thread, SIGUSR1) != 0) {
+		fprintf (stderr, "Signal sending failed\n");
 		return -1;
 	}	
 
@@ -110,7 +109,6 @@ int proxy_socksv4 (int port) {
 	int listen_socket_descriptor;
 	int client_socket_descriptor;
 	unsigned int length = sizeof(sockaddr_client);
-	int ret;
 
 	listen_socket_descriptor = create_listen_socket(port);
 	if(listen_socket_descriptor == -1) {
@@ -120,16 +118,18 @@ int proxy_socksv4 (int port) {
 	printf ("Listening\n");
 
 	for (;;) {
-		if ((client_socket_descriptor = accept(listen_socket_descriptor, (struct sockaddr *) &sockaddr_client, &length)) > 0) {
+		if ((client_socket_descriptor = accept(listen_socket_descriptor, (struct sockaddr *) 
+			&sockaddr_client, &length)) > 0) 
+		{
 			printf ("New client %d\n", client_socket_descriptor);
-			ret = handle_connection (client_socket_descriptor);
-			if (ret != 0) {
+			if (handle_connection (client_socket_descriptor) != 0) 
+			{
 				break;
 			}
 		}
 	}
 
-	return ret;
+	return 0;
 }
 
 
