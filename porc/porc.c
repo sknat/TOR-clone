@@ -68,10 +68,8 @@ int client_circuit_init () {
 
 	srand(time(NULL));
 	int r = rand() % nbr_relays;		// Select a random relay
-	client_circuit.relay1.ip = list_relays[r].ip;
-	client_circuit.relay1.port = list_relays[r].port;
 
-	if (mytls_client_session_init (client_circuit.relay1.ip, client_circuit.relay1.port,
+	if (mytls_client_session_init (list_relays[r].ip, list_relays[r].port,
 		 &(client_circuit.session), (&client_circuit.relay1_socket_descriptor)) < 0) 
 	{
 		fprintf (stderr, "Error joining 1st relay\n");

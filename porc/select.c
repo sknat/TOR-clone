@@ -8,17 +8,17 @@ int send_to_relay(char *buffer, int n, int porc_session_id) {
 
 
 int set_fds (int *nfds, fd_set *fds) {
-	CLIENT_CHAINED_LIST_LINK *c;
+	CHAINED_LIST_LINK *c;
 	int max = -2;
 	int n=1;
 
 	FD_ZERO (fds);
 	FD_SET (client_circuit.relay1_socket_descriptor, fds);
-	for (c=porc_sessions.first; c!=NULL; c=c->nxt) {
-		FD_SET (c->item.client_socket_descriptor, fds);
+	for (c=socks_session_list.first; c!=NULL; c=c->nxt) {
+		FD_SET (((ITEM_CLIENT*)(c->item))->client_socket_descriptor, fds);
 		n++;
-		if (c->item.client_socket_descriptor>max) {
-			max = c->item.client_socket_descriptor;
+		if (((ITEM_CLIENT*)(c->item))->client_socket_descriptor>max) {
+			max = ((ITEM_CLIENT*)(c->item))->client_socket_descriptor;
 		}
 	}
 
@@ -37,7 +37,7 @@ int do_proxy() {
 	int ret, nbr;
 	int nfds;
 	char buffer[BUF_SIZE+1];
-	CLIENT_CHAINED_LIST_LINK *c;
+	CHAINED_LIST_LINK *c;
 	sigset_t signal_set_tmp, signal_set;
 
 	sigemptyset(&signal_set_tmp);
@@ -67,22 +67,22 @@ int do_proxy() {
 				}
 				buffer [recvd] = '\0';
 				printf ("Receiving from relay (%d bytes) : %s\n", recvd, buffer);
-				if (send_to_relay(buffer, recvd, c->item.id)!=0) {
-					fprintf (stderr, "Stop (70), %d\n", c->item.id);
+				if (send_to_relay(buffer, recvd, c->id)!=0) {
+					fprintf (stderr, "Stop (70), %d\n", c->id);
 					return -1;
 				}
 			}
-			for (c=porc_sessions.first; c!=NULL; c=c->nxt) {
-				if (FD_ISSET (c->item.client_socket_descriptor, &read_fds)) {
-					int recvd = recv(c->item.client_socket_descriptor, buffer, BUF_SIZE, 0);
+			for (c=socks_session_list.first; c!=NULL; c=c->nxt) {
+				if (FD_ISSET (((ITEM_CLIENT*)(c->item))->client_socket_descriptor, &read_fds)) {
+					int recvd = recv(((ITEM_CLIENT*)(c->item))->client_socket_descriptor, buffer, BUF_SIZE, 0);
 					if(recvd <= 0) {
-						fprintf (stderr, "Stop (100), %d\n", c->item.id);
+						fprintf (stderr, "Stop (100), %d\n", c->id);
 						return -1;
 					}
 					buffer [recvd] = '\0';
 					printf ("Receiving from client (%d bytes) : %s\n", recvd, buffer);
-					if (send_to_relay(buffer, recvd, c->item.id)!=0) {
-						fprintf (stderr, "Stop (250), %d\n", c->item.id);
+					if (send_to_relay(buffer, recvd, c->id)!=0) {
+						fprintf (stderr, "Stop (250), %d\n", c->id);
 						return -1;
 					}
 				}

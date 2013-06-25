@@ -1,9 +1,11 @@
 #include "clientmain.h"
-#include "porc.c"
-#include "signaling.c"
+//#include "porc.c"
+//#include "signaling.c"
 
 pthread_t accepting_thread; // ACCEPT thread
 pthread_t selecting_thread; // SELECT thread
+CHAINED_LIST socks_session_list;
+CLIENT_CIRCUIT client_circuit;
 
 //The proxy method to be runned in a thread
 void *start_proxy(void *arg){
@@ -29,7 +31,7 @@ int main () {
 		return -1;
 	}
 
-	ChainedListInit (&porc_sessions);
+	ChainedListInit (&socks_session_list);
 
 	//Creates a thread to run the client proxy
 	selecting_thread = pthread_self ();

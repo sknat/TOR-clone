@@ -18,6 +18,7 @@
 #include "config.h"
 #include "mytcp.h"
 #include "mytls.h"
+#include "clientmain.h"
 
 
 extern int nbr_relays;

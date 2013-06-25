@@ -13,7 +13,7 @@ int new_client(int client_socket_descriptor, uint32_t ip, uint16_t port) {
 	PORC_COMMAND porc_command;
 	PORC_ACK porc_ack;
 	MYSOCKET target;
-	CLIENT_CHAINED_LIST_ITEM *porc_session;
+	ITEM_CLIENT *socks_session;
 
 
 	// PORC handshake
@@ -52,8 +52,8 @@ int new_client(int client_socket_descriptor, uint32_t ip, uint16_t port) {
 
 	// Record the PORC session
 
-	ClientChainedListNew (&porc_sessions, &porc_session);
-	porc_session->client_socket_descriptor = client_socket_descriptor;
+	ChainedListNew (&socks_session_list, (void*)&socks_session, sizeof(ITEM_CLIENT));
+	socks_session->client_socket_descriptor = client_socket_descriptor;
 
 	return 1;
 }
@@ -108,7 +108,7 @@ int proxy_socksv4 (int port) {
 	struct sockaddr_in sockaddr_client;
 	int listen_socket_descriptor;
 	int client_socket_descriptor;
-	unsigned int length = sizeof(sockaddr_client);
+	int length = sizeof(sockaddr_client);
 
 	listen_socket_descriptor = create_listen_socket(port);
 	if(listen_socket_descriptor == -1) {

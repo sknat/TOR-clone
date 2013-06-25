@@ -69,6 +69,8 @@ int ChainedListNew (CHAINED_LIST *p, void **item, int item_size)
 	p->length++;
 
 	*item = &(el->item);
+	
+	return el->id;
 }
 
 void ChainedListClear (CHAINED_LIST *p)

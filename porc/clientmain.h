@@ -25,7 +25,7 @@
 #include "porc.h"
 #include "signaling.h"
 
-
+extern CHAINED_LIST socks_session_list;
 
 /*
 	CLIENT_CIRCUIT - Circuit information for the PORC client.
@@ -37,7 +37,9 @@ typedef struct CLIENT_CIRCUIT {
 	MYSOCKET relay2;
 	MYSOCKET relay3;
 }	CLIENT_CIRCUIT;
-CLIENT_CIRCUIT	client_circuit;
+
+
+extern CLIENT_CIRCUIT client_circuit;
 
 
 

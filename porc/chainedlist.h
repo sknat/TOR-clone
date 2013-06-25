@@ -6,6 +6,7 @@
 #define PORC_CHAINED_LIST
 
 #include <gnutls/gnutls.h>
+#include <gnutls/x509.h>
 #include <stdlib.h>
 
 
@@ -13,7 +14,7 @@ typedef struct ITEM_CLIENT
 {
 	int id;				// SOCKS session id
 	int client_socket_descriptor;	// SOCKS client socket descriptor
-} 	CLIENT_CHAINED_LIST_ITEM;
+} 	ITEM_CLIENT;
 
 
 
@@ -21,7 +22,7 @@ typedef struct ITEM_CLIENT
 typedef struct ITEM_TLS_SESSION
 {	
 	int socket_descriptor;
-	gnutls_t session;
+	gnutls_session_t session;
 }	ITEM_TLS_SESSION;
 
 
