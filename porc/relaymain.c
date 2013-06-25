@@ -191,7 +191,7 @@ int process_tor_packet(char *buffer, int n, int tls_session_id) {
 }
 
 int send_to_porc(char *buffer, int n, int socks_session_id) {
-
+	// Send a packet from a target to a relay.
 
 
 	return 0;
