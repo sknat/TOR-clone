@@ -133,18 +133,20 @@ static int _verify_certificate_callback (gnutls_session_t session) {
 
 
 int mytls_server_init (int port, gnutls_certificate_credentials_t *xcred, gnutls_priority_t *priority_cache, int *listen_socket_descriptor,
-	struct sockaddr_in *sockaddr_server)
+	struct sockaddr_in *sockaddr_server, int trust)
 {
 	int ret;
 	int optval = 1;
 
-	// this must be called once in the program
-	gnutls_global_init ();
+	if ((ret=gnutls_global_init ()) < 0) {
+		fprintf (stderr, "Error in gnutls_global_init : %s\n", gnutls_strerror(ret));
+	}
 
-	gnutls_certificate_allocate_credentials (xcred);
+	if ((ret=gnutls_certificate_allocate_credentials (xcred)) < 0) {
+		fprintf (stderr, "Error in gnutls_certificate_allocate_credentials : %s\n", gnutls_strerror(ret));
+	}
 
 	ret = gnutls_certificate_set_x509_key_file (*xcred, CERT_FILE, KEY_FILE, GNUTLS_X509_FMT_PEM);
-
 	if (ret < 0) {
 		printf("No certificate or key were found\n");
 		exit(1);

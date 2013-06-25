@@ -1,6 +1,4 @@
 #include "clientmain.h"
-//#include "porc.c"
-//#include "signaling.c"
 
 pthread_t accepting_thread; // ACCEPT thread
 pthread_t selecting_thread; // SELECT thread

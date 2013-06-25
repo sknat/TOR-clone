@@ -17,14 +17,13 @@
 #include <sys/stat.h>
 #include <unistd.h> 
 #include <fcntl.h>
+#include <errno.h>
 
 #include "config.h"
 #include "mytls.h"
 #include "mytcp.h"
 
 
-// BUG : Connot use global variable xcred.
-gnutls_certificate_credentials_t xcred_serv;
 
 static gnutls_priority_t priority_cache;
 static struct sockaddr_in sockaddr_server;
@@ -46,7 +45,7 @@ void *handle_connection(void *arg) {
 
 	gnutls_init (&session, GNUTLS_SERVER);
 	gnutls_priority_set (session, priority_cache);
-	gnutls_credentials_set (session, GNUTLS_CRD_CERTIFICATE, xcred_serv);
+	gnutls_credentials_set (session, GNUTLS_CRD_CERTIFICATE, xcred);
 	gnutls_certificate_server_set_request (session, GNUTLS_CERT_IGNORE);
 
 	gnutls_transport_set_int (session, client_socket_descriptor);
@@ -133,20 +132,21 @@ int main (void)
 		return -1;
 	}
 
-	nbr_relays = fileinfo.st_size;
+	nbr_relays = fileinfo.st_size/sizeof(MYSOCKET);
 
 	list_relays = malloc (nbr_relays*sizeof(MYSOCKET));
 
 	file = open (LIST_RELAYS, O_RDONLY);
 	if (file == -1) {
-		fprintf (stderr, "Impossible to open \"%s\"\n", LIST_RELAYS);
+		ret = errno;
+		fprintf (stderr, "Impossible to open \"%s\", errno = %d\n", LIST_RELAYS, ret);
 		free (list_relays);
 		return -1;
 	}
 
 	ret = read (file, list_relays, sizeof(MYSOCKET)*nbr_relays);
 	if (ret != sizeof(MYSOCKET)*nbr_relays) {
-		fprintf (stderr, "Error in writing : %d\n", ret);
+		fprintf (stderr, "Error in reading : %d bytes read instead of %d\n", ret, sizeof(MYSOCKET)*nbr_relays);
 		free (list_relays);
 		return -1;
 	}
@@ -155,7 +155,7 @@ int main (void)
 
 	printf ("%d trusted relays successfully read from file \"%s\"\n", nbr_relays, LIST_RELAYS);	
 
-	if (mytls_server_init (DIRECTORY_PORT, &xcred_serv, &priority_cache, &listen_socket_descriptor, &sockaddr_server) != 0) {
+	if (mytls_server_init (DIRECTORY_PORT, &xcred, &priority_cache, &listen_socket_descriptor, &sockaddr_server, 0) != 0) {
 		return -1;
 	}
 
@@ -173,7 +173,7 @@ int main (void)
 	}
 	close (listen_socket_descriptor);
 
-	gnutls_certificate_free_credentials (xcred_serv);
+	gnutls_certificate_free_credentials (xcred);
 	gnutls_priority_deinit (priority_cache);
 
 	gnutls_global_deinit ();

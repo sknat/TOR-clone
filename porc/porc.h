@@ -24,6 +24,41 @@
 extern int nbr_relays;
 extern MYSOCKET *list_relays;
 
+
+
+/*
+	DIRECTORY_REQUEST - Request for the list of the trusted relays.
+*/
+#define DIRECTORY_ASK	65
+typedef struct DIRECTORY_REQUEST {
+	uint8_t command;
+} __attribute__((packed))	DIRECTORY_REQUEST;
+
+/*
+	DIRECTORY_RESPONSE - Response from the directory to a DIRECTORY_REQUEST message.
+*/
+#define DIRECTORY_SUCCESS	0
+#define DIRECTORY_FAILURE	1
+typedef struct DIRECTORY_RESPONSE {
+	uint8_t status;
+	uint16_t nbr;		// number of MYSOCKET structures following
+} __attribute__((packed))	DIRECTORY_RESPONSE;
+
+
+#define PORC_COMMAND_CONNECT_RELAY	100	// Asks the last PORC relay to join a new relay
+#define PORC_COMMAND_CONNECT_TARGET	110	// Asks the last PORC relay to join a extern target
+#define PORC_COMMAND_TRANFER		120	// Asks the PORC relays to transfer a message to the target
+#define PORC_COMMAND_DISCONNECT		130	// Asks the last PORC relay to disconnect
+#define PORC_COMMAND_DISCONNECT_TARGET	140	// Asks the last PORC relay to disconnect from the target
+typedef uint8_t PORC_COMMAND;
+#define PORC_ACK_CONNECT_RELAY		200	// Asks the last PORC relay to join a new relay
+#define PORC_ACK_CONNECT_TARGET		210	// Asks the last PORC relay to join a extern target
+typedef uint8_t PORC_ACK;
+
+
+
+
+
 /*
 	gnutls_global_init must have been called prior to thiese functions
 */

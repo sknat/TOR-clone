@@ -21,6 +21,7 @@
 #include "mytls.h"
 #include "chainedlist.h"
 #include "signaling.h"
+#include "porcproto.h"
 
 
 extern int nbr_relays;
