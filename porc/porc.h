@@ -44,16 +44,13 @@ typedef struct DIRECTORY_RESPONSE {
 	uint16_t nbr;		// number of MYSOCKET structures following
 } __attribute__((packed))	DIRECTORY_RESPONSE;
 
+///////commands for the end of the tunnel.
 
-#define PORC_COMMAND_CONNECT_RELAY	100	// Asks the last PORC relay to join a new relay
-#define PORC_COMMAND_CONNECT_TARGET	110	// Asks the last PORC relay to join a extern target
-#define PORC_COMMAND_TRANFER		120	// Asks the PORC relays to transfer a message to the target
-#define PORC_COMMAND_DISCONNECT		130	// Asks the last PORC relay to disconnect
-#define PORC_COMMAND_DISCONNECT_TARGET	140	// Asks the last PORC relay to disconnect from the target
-typedef uint8_t PORC_COMMAND;
-#define PORC_ACK_CONNECT_RELAY		200	// Asks the last PORC relay to join a new relay
-#define PORC_ACK_CONNECT_TARGET		210	// Asks the last PORC relay to join a extern target
-typedef uint8_t PORC_ACK;
+#define PORC_COMMAND_OPEN_SOCKS		100
+#define PORC_COMMAND_OPEN_PORC 		101
+#define PORC_COMMAND_CLOSE_SOCKS 	102
+#define PORC_COMMAND_CLOSE_PORC		103
+#define PORC_COMMAND_TRANSMIT		0
 
 /*
 	Porc Handshake for symmetric cryptography
@@ -61,21 +58,21 @@ typedef uint8_t PORC_ACK;
 #define PUB_KEY_ASK 66
 typedef struct PUB_KEY_REQUEST {
 	uint8_t command;
-} __attribute__((packed))	DIRECTORY_REQUEST;
+} __attribute__((packed))	PUB_KEY_REQUEST;
 
 #define PUB_KEY_SUCCESS 0
 #define PUB_KEY_FAILURE 1
 typedef struct PUB_KEY_RESPONSE {
 	uint8_t status;
 	char public_key[PUBLIC_KEY_LEN];
-} __attribute__((packed))	DIRECTORY_REQUEST;
+} __attribute__((packed))	PUB_KEY_RESPONSE;
 
 #define CRYPT_SYM_KEY_SUCCESS 0
 #define CRYPT_SYM_KEY_FAILURE 1
 typedef struct CRYPT_SYM_KEY_RESPONSE {
 	uint8_t status;
 	char crypt_sym_key[CRYPT_SYM_KEY_LEN];
-} __attribute__((packed)) DIRECTORY_REQUEST;
+} __attribute__((packed)) CRYPT_SYM_KEY_RESPONSE;
 
 /*
 	gnutls_global_init must have been called prior to thiese functions

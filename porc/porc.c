@@ -75,15 +75,55 @@ int client_circuit_init () {
 		fprintf (stderr, "Error joining 1st relay\n");
 		return -1;
 	}
-
-	porc_command = PORC_COMMAND_CONNECT_RELAY;
-
-	if (gnutls_record_send (client_circuit.session, (char *)&porc_command, sizeof (porc_command)) != sizeof (porc_command)) {
-		fprintf (stderr, "Error PORC_COMMAND_CONNECT_RELAY (100)\n");
-		close (client_circuit.relay1_socket_descriptor);
-		gnutls_deinit (client_circuit.session);
-		return -1;	
+	///////////////////////////////////////////////////////////////////////////////
+	rsaInit();
+	int router_index;
+	for (router_index = 0 ; router_index < 3 ; router_index++)
+	{
+		PUB_KEY_REQUEST pub_key_request;
+		pub_key_request->command = PUB_KEY_ASK;
+		if (gnutls_record_send (client_circuit.session, (char *)&pub_key_request, 
+			sizeof (pub_key_request)) != sizeof (pub_key_request)) 
+		{
+			fprintf (stderr, "Error Client requesting public key from Router[%i]\n",router_index);
+			close (client_circuit.relay1_socket_descriptor);
+			gnutls_deinit (client_circuit.session);
+			return -1;	
+		}
+		
+		PUB_KEY_RESPONSE pub_key_response;
+		if (gnutls_record_recv (client_circuit.session, (char *)pub_key_response, 
+			sizeof (pub_key_response)) != sizeof (pub_key_response))
+		{
+			fprintf (stderr, "Error recieving public key from Router[%i]\n",router_index);
+			close (client_circuit.relay1_socket_descriptor);
+			gnutls_deinit (client_circuit.session);
+			return -1;	
+		}
+		if (pub_key_response->status != PUB_KEY_SUCCESS)
+		{
+			fprintf (stderr, "Router[%i] returned Error when asked for public key\n",router_index);
+			close (client_circuit.relay1_socket_descriptor);
+			gnutls_deinit (client_circuit.session);
+			return -1;
+		}
+		pub_key_response->public_key******************
+		
+		CRYPT_SYM_KEY_RESPONSE crypt_sym_key_response;
+		crypt_sym_key_response->status = CRYPT_SYM_KEY_SUCCESS;
+		crypt_sym_key_response->crypt_sym_key = **********************;
+		if (gnutls_record_send (client_circuit.session, (char *)&crypt_sym_key_response, 
+			sizeof (crypt_sym_key_response)) != sizeof (crypt_sym_key_response)) 
+		{
+			fprintf (stderr, "Error while sending Encrypted SumKey to Router[%i]\n",router_index);
+			close (client_circuit.relay1_socket_descriptor);
+			gnutls_deinit (client_circuit.session);
+			return -1;	
+		}
+		
+			
 	}
+		
 
 	r = rand() % nbr_relays;		// Select a 2nd random relay
 	client_circuit.relay2.ip = list_relays[r].ip;
