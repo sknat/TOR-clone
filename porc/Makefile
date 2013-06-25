@@ -2,8 +2,8 @@ CC	= gcc
 CFLAGS	= -O0 -Wall $(INCLUDE) `pkg-config gnutls --cflags`
 LIBS	= `pkg-config gnutls --libs`
 
-SRC	=	relay.c clientmain.c select.c sclient.c mytls.c socks.c mytcp.c directory.c setdir.c relaychainedlist.c clientchainedlist.c
-OBJ	=	relay.o clientmain.o select.o sclient.o mytls.o socks.o mytcp.o directory.o setdir.o relaychainedlist.o clientchainedlist.o
+SRC	=	relay.c clientmain.c select.c sclient.c mytls.c socks.c mytcp.c directory.c setdir.c chainedlist.c
+OBJ	=	relay.o clientmain.o select.o sclient.o mytls.o socks.o mytcp.o directory.o setdir.o chainedlist.o
 BINS	=	relay.exe client.exe sclient.exe directory.exe setdir.exe
 
 all:	$(BINS)
@@ -15,20 +15,20 @@ setdir.exe:	setdir.o
 	@echo [link]
 	$(CC) -o $@ setdir.o $(LIBS)
 
-relay.exe:	relay.o mytls.o mytcp.o relaychainedlist.o
+relay.exe:	relay.o mytls.o mytcp.o chainedlist.o
 	@echo "--------------------------------------------------------------------------------"
 	@echo [link]
-	$(CC) -o $@ relay.o mytls.o mytcp.o relaychainedlist.o $(LIBS) -lpthread
+	$(CC) -o $@ relay.o mytls.o mytcp.o chainedlist.o $(LIBS) -lpthread
 
 directory.exe:	directory.o mytls.o mytcp.o
 	@echo "--------------------------------------------------------------------------------"
 	@echo [link]
 	$(CC) -o $@ directory.o mytls.o mytcp.o $(LIBS) -lpthread
 
-client.exe:	clientmain.o select.o mytls.o socks.o mytcp.o clientchainedlist.o
+client.exe:	clientmain.o select.o mytls.o socks.o mytcp.o chainedlist.o
 	@echo "--------------------------------------------------------------------------------"
 	@echo [link]
-	$(CC) -o $@ clientmain.o select.o mytls.o socks.o mytcp.o clientchainedlist.o $(LIBS) -lpthread
+	$(CC) -o $@ clientmain.o select.o mytls.o socks.o mytcp.o chainedlist.o $(LIBS) -lpthread
 
 sclient.exe:	sclient.o
 	@echo "--------------------------------------------------------------------------------"

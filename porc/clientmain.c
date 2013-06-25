@@ -29,7 +29,7 @@ int main () {
 		return -1;
 	}
 
-	ClientChainedListInit (&porc_sessions);
+	ChainedListInit (&porc_sessions);
 
 	//Creates a thread to run the client proxy
 	selecting_thread = pthread_self ();

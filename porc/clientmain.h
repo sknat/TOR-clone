@@ -20,7 +20,7 @@
 #include "mytcp.h"
 #include "mytls.h"
 #include "socks.h"
-#include "clientchainedlist.h"
+#include "chainedlist.h"
 #include "select.h"
 #include "porc.h"
 #include "signaling.h"
