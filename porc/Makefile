@@ -15,10 +15,10 @@ setdir.exe:	setdir.o
 	@echo [link]
 	$(CC) -o $@ setdir.o $(LIBS)
 
-relay.exe:	relay.o mytls.o mytcp.o chainedlist.o signaling.o
+relay.exe:	relaymain.o mytls.o mytcp.o chainedlist.o signaling.o
 	@echo "--------------------------------------------------------------------------------"
 	@echo [link]
-	$(CC) -o $@ signaling.o relay.o mytls.o mytcp.o chainedlist.o $(LIBS) -lpthread
+	$(CC) -o $@ signaling.o relaymain.o mytls.o mytcp.o chainedlist.o $(LIBS) -lpthread
 
 directory.exe:	directory.o mytls.o mytcp.o
 	@echo "--------------------------------------------------------------------------------"
