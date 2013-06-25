@@ -24,7 +24,7 @@ int aesInit()
 	/* Version check should be the very first call because it
 	makes sure that important subsystems are intialized. */
 	if (!gcry_check_version (GCRYPT_VERSION)) {
-		fprintf ("libgcrypt version mismatch\n");
+		fprintf (stderr, "libgcrypt version mismatch\n");
 		return -1;
 	}
 	gcry_control (GCRYCTL_ENABLE_QUICK_RANDOM, 0);
@@ -39,7 +39,7 @@ int aesInit()
 	return 0;
 }
 
-void aesGenKey()
+int aesGenKey()
 {
 	if (iniVector != NULL) {
 		free (iniVector);
@@ -57,9 +57,10 @@ void aesGenKey()
 		fprintf (stderr, "gcry_cipher_setkey failed\n");
 		return -1;
 	}
+	return 0;
 }
 
-void aesSetKey(char * aesSymKey, char * aesIniVector)
+int aesSetKey(char * aesSymKey, char * aesIniVector)
 {	
 	if (gcry_cipher_setkey(gcryCipherHd, keyRemind, keyLength)) {
 		fprintf (stderr, "gcry_cipher_setkey failed\n");
@@ -67,6 +68,7 @@ void aesSetKey(char * aesSymKey, char * aesIniVector)
 	}
 	iniVector = aesIniVector;
 	keyRemind = aesSymKey;
+	return 0;
 }
 
 int aesEncrypt (char * buffer, size_t buffer_len)

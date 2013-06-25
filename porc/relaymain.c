@@ -11,6 +11,9 @@ static gnutls_priority_t priority_cache;
 pthread_t accepting_thread;
 pthread_t selecting_thread;
 
+gcry_sexp_t * publicKey; 
+gcry_sexp_t * privateKey;
+
 
 CHAINED_LIST tls_session_list;
 CHAINED_LIST porc_session_list;
@@ -42,14 +45,75 @@ int handle_connection(int client_socket_descriptor) {
 		return -1;
 	}
 	printf ("Tls handshake was completed\n");
-
-	// TODO : Start a PORC session
+	
+	// Record TLS session
+	ITEM_TLS_SESSION * tls_session;
+	int tls_session_id;
+	tls_session_id = ChainedListNew (&tls_session_list, (void**) &tls_session, sizeof(ITEM_TLS_SESSION));
+	tls_session->socket_descriptor = client_socket_descriptor;
+	tls_session->session = session;
+	
+	
+	// Start a PORC session
+	// wait for asking public key
+	PUB_KEY_REQUEST pub_key_request;
+	if (gnutls_record_recv (session, (char *)&pub_key_request, 
+		sizeof (pub_key_request)) != sizeof (pub_key_request))
+	{
+		fprintf (stderr, "Error in public key request (router)\n");
+		return -1;
+	}
+	if (pub_key_request.command != PUB_KEY_ASK)
+	{
+		fprintf (stderr, "Error : invalid public key request\n");
+		return -1;
+	}
+	//Send public Key
+	PUB_KEY_RESPONSE pub_key_response;
+	char * export_pub_key = malloc(PUBLIC_KEY_LEN);
+	if (rsaExportKey(publicKey, export_pub_key)!=0)
+	{
+		fprintf (stderr, "Error exporting public key (router)\n");
+		return -1;
+	}
+	pub_key_response.status = PUB_KEY_SUCCESS;
+	memcpy(pub_key_response.public_key,export_pub_key,PUBLIC_KEY_LEN);
+	if (gnutls_record_send (session, (char *)&pub_key_response, 
+		sizeof (pub_key_response)) != sizeof (pub_key_response))
+	{
+		fprintf (stderr, "Error sending public key (router)\n");
+		return -1;
+	}
+	free(export_pub_key);
+	//Wait for the symmetric key
+	CRYPT_SYM_KEY_RESPONSE crypt_sym_key_response;
+	if (gnutls_record_recv (session, (char *)&crypt_sym_key_response, 
+		sizeof (crypt_sym_key_response)) != sizeof (crypt_sym_key_response)) 
+	{
+		fprintf (stderr, "Error while awaiting symmetric key (router)\n");
+		return -1;	
+	}
+	if (crypt_sym_key_response.status != CRYPT_SYM_KEY_SUCCESS)
+	{
+		fprintf (stderr, "Error : invalid symmetric key\n");
+		return -1;
+	}
 
 	// Record the PORC session
 	ITEM_PORC_SESSION *porc_session;
 	int id_porc_session;
+
 	id_porc_session = ChainedListNew (&porc_session_list, (void *)&porc_session, sizeof(ITEM_PORC_SESSION));
-	// TODO: porc_session->...=...;
+	if (rsaDecrypt(crypt_sym_key_response.crypt_sym_key, porc_session->sym_key, *privateKey)!=0)
+	{
+		fprintf (stderr, "Error decrypting symmetric key\n");
+		return -1;
+	}
+	//Record into the structure
+	porc_session->id_prev = pub_key_request.porc_session; 
+	porc_session->client_tls_session = tls_session_id;
+	porc_session->final = 1;
+	porc_session->server_tls_session = 0;
 
 
 	// Signaling a new available socket to the selecting thread
@@ -120,7 +184,13 @@ int set_fds (int *nfds, fd_set *fds) {
 
 
 
-int process_tor_packet(char *buffer, int n, int tls_session_id) {
+int process_porc_packet(char *buffer, int n, int tls_session_id) {
+	/*ITEM_TLS_SESSION * tls_session;
+	gnutls_session_t session;
+	
+	ChainedListFind (&tls_session_list, tls_session_id, (void**)&tls_session);
+	session = tls_session->session;
+
 	// Read the number of bytes
 	int length;
 	if (gnutls_record_recv (session, (char *)&length, sizeof(length))
@@ -131,7 +201,7 @@ int process_tor_packet(char *buffer, int n, int tls_session_id) {
 	}
 
 	// Read the remainder of the packet
-	char *buffer = malloc (length-sizeof(length));
+	//char *buffer = malloc (length-sizeof(length));
 	if (gnutls_record_recv (session, buffer, length-sizeof(length))
 		!= length-sizeof (length))
 	{
@@ -143,17 +213,17 @@ int process_tor_packet(char *buffer, int n, int tls_session_id) {
 	int porc_id = ((int *)buffer)[1];		// Read the PORC session
 
 	int sock_session_id;
-	ITEM_SOCKS_SESSION sock_session;
+	ITEM_SOCKS_SESSION *sock_session;
 	if (direction == PORC_DIRECTION_DOWN) {
 		// We must decode
 
 		CHAINED_LIST_LINK *c;
 		for (c=socks_session_list.first; c!=NULL; c=c->nxt) {
-			if ((((ITEM_SOCKS_SESSION*)(c->item))->id_prev == porc_id_prev)) &&
-				(((ITEM_SOCKS_SESSION*)(c->item))->client_tls_session == tls_session_id))
-			{
+			if ((((ITEM_SOCKS_SESSION*)(c->item))->id_prev == porc_id)// &&
+				//(((ITEM_SOCKS_SESSION*)(c->item))->client_tls_session == tls_session_id))
+			){
 				sock_session_id = c->id;
-				sock_session = (ITEM_SOCKS_SESSION *)(c->item);
+				sock_session = (ITEM_PORC_SESSION *)(c->item);
 
 				if (sock_session->final == 0) {
 					// Decode and send to the next relay
@@ -186,7 +256,7 @@ int process_tor_packet(char *buffer, int n, int tls_session_id) {
 		return -1;
 	}
 
-	fprintf (stderr, "Incorrect PORC session.\n");
+	fprintf (stderr, "Incorrect PORC session.\n");*/
 	return -1;
 }
 
@@ -273,8 +343,20 @@ int main (int argc, char **argv)
 	int port;
 	int ret;
 
+	if (rsaInit()!=0) 
+	{
+		fprintf(stderr, "Error initializing RSA\n");
+		return -1;
+	}
+	
+	if (rsaGenKey(publicKey, privateKey)!=0) 
+	{
+		fprintf(stderr, "Error initializing RSA Keys\n");
+		return -1;
+	}
+	
 	if (argc != 2) {
-		printf ("Incorrect number of argument : you must define a port to listen to\n");
+		fprintf (stderr, "Incorrect number of argument : you must define a port to listen to\n");
 		return -1;
 	}
 	port = atoi (argv[1]);
@@ -284,7 +366,9 @@ int main (int argc, char **argv)
 		return -1;
 	}
 
-	if ((ret=mytls_server_init (port, &xcred, &priority_cache, &listen_socket_descriptor, &sockaddr_server))!=0) {
+	if ((ret=mytls_server_init (port, &xcred, &priority_cache, &listen_socket_descriptor, 
+	&sockaddr_server,1))!=0) 
+	{
 		fprintf (stderr, "Error in mytls_client_global_init()\n");
 		return -1;
 	}

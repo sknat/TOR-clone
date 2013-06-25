@@ -18,9 +18,9 @@ int new_client(int client_socket_descriptor, uint32_t ip, uint16_t port) {
 
 	// PORC handshake
 // envoyer en plus un numéro de session
-	porc_command = PORC_COMMAND_CONNECT_TARGET;
+	porc_command = PORC_COMMAND_OPEN_SOCKS;
 	if (gnutls_record_send (client_circuit.session, (char *)&porc_command, sizeof (porc_command)) != sizeof (porc_command)) {
-		fprintf (stderr, "Error PORC_COMMAND_CONNECT_TARGET (100)\n");
+		fprintf (stderr, "Error PORC_COMMAND_OPEN_SOCKS (100)\n");
 		close (client_socket_descriptor);
 		return -1;	
 	}
@@ -30,7 +30,7 @@ int new_client(int client_socket_descriptor, uint32_t ip, uint16_t port) {
 	if (gnutls_record_send (client_circuit.session, (char *)&target, sizeof (target))
 		!= sizeof (target))
 	{
-		fprintf (stderr, "Error PORC_COMMAND_CONNECT_TARGET (200)\n");
+		fprintf (stderr, "Error PORC_COMMAND_OPEN_SOCKS (200)\n");
 		close (client_socket_descriptor);
 		return -1;	
 	}
@@ -38,16 +38,16 @@ int new_client(int client_socket_descriptor, uint32_t ip, uint16_t port) {
 	if (gnutls_record_recv (client_circuit.session, (char *)&porc_ack, sizeof (porc_ack))
 		!= sizeof (porc_ack))
 	{
-		fprintf (stderr, "Error PORC_COMMAND_CONNECT_TARGET (250)\n");
+		fprintf (stderr, "Error PORC_COMMAND_OPEN_SOCKS (250)\n");
 		close (client_socket_descriptor);
 		return -1;	
 	}
 
-	if (porc_ack != PORC_ACK_CONNECT_TARGET) {
+	/*if (porc_ack != PORC_ACK_CONNECT_TARGET) {
 		printf ("Impossible to join target\n");
 		close (client_socket_descriptor);
 		return 0;
-	}
+	}*/
 
 
 	// Record the PORC session

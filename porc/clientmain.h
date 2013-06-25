@@ -24,7 +24,8 @@
 #include "select.h"
 #include "porc.h"
 #include "signaling.h"
-#include "porcproto.h"
+#include "aes.h"
+#include "rsa.h"
 
 extern CHAINED_LIST socks_session_list;
 

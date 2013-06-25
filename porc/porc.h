@@ -24,7 +24,8 @@
 extern int nbr_relays;
 extern MYSOCKET *list_relays;
 
-
+#define PORC_DIRECTION_DOWN 3
+#define PORC_DIRECTION_UP 2
 
 /*
 	DIRECTORY_REQUEST - Request for the list of the trusted relays.
@@ -52,12 +53,16 @@ typedef struct DIRECTORY_RESPONSE {
 #define PORC_COMMAND_CLOSE_PORC		103
 #define PORC_COMMAND_TRANSMIT		0
 
+typedef int PORC_COMMAND;
+typedef int PORC_ACK;
+
 /*
 	Porc Handshake for symmetric cryptography
 */
 #define PUB_KEY_ASK 66
 typedef struct PUB_KEY_REQUEST {
 	uint8_t command;
+	int porc_session;
 } __attribute__((packed))	PUB_KEY_REQUEST;
 
 #define PUB_KEY_SUCCESS 0

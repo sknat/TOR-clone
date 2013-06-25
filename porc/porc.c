@@ -9,28 +9,28 @@ int presentkeys = 0;
 
 MYSOCKET *list_relays = NULL;
 
-int porc_record_recv (session, char * msg, size_t size)
+int porc_record_recv (gnutls_session_t session, char * msg, size_t size)
 	{
 		size_t cSize = size;
 		int i;
 		for (i=0 ; i<presentkeys ; i++)
 		{
-			aesImportKey(keyTable[i]);
+			aesImportKey(keytable[i]);
 			cSize = aesDecrypt(msg,cSize);
 		}
-		return (gnutls_record_recv (session, msg, size)
+		return (gnutls_record_recv (session, msg, size));
 	}
 	
-int porc_record_send (session, char * msg, size_t size)
+int porc_record_send (gnutls_session_t session, char * msg, size_t size)
 	{
 		size_t cSize = size;
 		int i;
 		for (i=presentkeys ; i>0 ; i--)
 		{
-			aesImportKey(keyTable[i]);
+			aesImportKey(keytable[i]);
 			cSize = aesEncrypt(msg,cSize);
 		}
-		return (gnutls_record_send (session, msg, size)
+		return (gnutls_record_send (session, msg, size));
 	}
 
 
@@ -116,10 +116,10 @@ int client_circuit_init () {
 		// Select a random relay
 		int r;
 		gcry_randomize(&r,4,GCRY_STRONG_RANDOM);
-		r = t % nbr_relays;		
+		r = r % nbr_relays;		
 		//Connect with tls to this relay
 		if (mytls_client_session_init (list_relays[r].ip, list_relays[r].port,
-			&cur_session, &socket_descriptor) < 0) 
+			&session, &socket_descriptor) < 0) 
 		{
 			fprintf (stderr, "Error joining relay[%i]\n",router_index);
 			return -1;
@@ -127,12 +127,13 @@ int client_circuit_init () {
 		// Memorize the first relay
 		if (router_index==0)
 		{
-			client_circuit.session = session;//#################################
+			client_circuit.session = session;
 			client_circuit.relay1_socket_descriptor = socket_descriptor;
 		}
 		//Ask for public key of next node
 		PUB_KEY_REQUEST pub_key_request;
-		pub_key_request->command = PUB_KEY_ASK;
+		pub_key_request.command = PUB_KEY_ASK;
+		pub_key_request.porc_session = 0;
 		if (porc_record_send (session, (char *)&pub_key_request, 
 			sizeof (pub_key_request)) != sizeof (pub_key_request)) 
 		{
@@ -143,7 +144,7 @@ int client_circuit_init () {
 		}
 		//Wait for Public key
 		PUB_KEY_RESPONSE pub_key_response;
-		if (porc_record_recv (session, (char *)pub_key_response, 
+		if (porc_record_recv (session, (char *)&pub_key_response, 
 			sizeof (pub_key_response)) != sizeof (pub_key_response))
 		{
 			fprintf (stderr, "Error recieving public key from Router[%i]\n",router_index);
@@ -151,7 +152,7 @@ int client_circuit_init () {
 			gnutls_deinit (session);
 			return -1;	
 		}
-		if (pub_key_response->status != PUB_KEY_SUCCESS)
+		if (pub_key_response.status != PUB_KEY_SUCCESS)
 		{
 			fprintf (stderr, "Router[%i] returned Error when asked for public key\n",router_index);
 			close (socket_descriptor);
@@ -163,11 +164,19 @@ int client_circuit_init () {
 		aesGenKey();
 		char * cryptClientSymKey = malloc(CRYPT_SYM_KEY_LEN);
 		aesExportKey(keytable[router_index]);
-		rsaEncrypt(keytable[router_index], cryptClientSymKey, pub_key_response->public_key);
+		gcry_sexp_t pubkey;
+		if (rsaImportKey(pub_key_response.public_key, &pubkey )!=0)
+		{
+			fprintf (stderr, "Error importing public key given by router\n");
+			close (socket_descriptor);
+			gnutls_deinit (session);
+			return -1;
+		}
+		rsaEncrypt(keytable[router_index], cryptClientSymKey, pubkey );
 		//Send Encripted SymmetricKey
 		CRYPT_SYM_KEY_RESPONSE crypt_sym_key_response;
-		crypt_sym_key_response->status = CRYPT_SYM_KEY_SUCCESS;
-		strcpy(crypt_sym_key_response->crypt_sym_key,cryptClientSymKey);
+		crypt_sym_key_response.status = CRYPT_SYM_KEY_SUCCESS;
+		memcpy(crypt_sym_key_response.crypt_sym_key,cryptClientSymKey,PUBLIC_KEY_LEN);
 		if (porc_record_send (session, (char *)&crypt_sym_key_response, 
 			sizeof (crypt_sym_key_response)) != sizeof (crypt_sym_key_response)) 
 		{
@@ -187,7 +196,7 @@ int client_circuit_init () {
 }
 
 int client_circuit_free () {
-	PORC_COMMAND porc_command = PORC_COMMAND_DISCONNECT;
+	/*//PORC_COMMAND porc_command = PORC_COMMAND_DISCONNECT;
 
 	if (porc_record_send (client_circuit.session, (char *)&porc_command, sizeof (porc_command)) != sizeof (porc_command)) {
 		fprintf (stderr, "Error PORC_COMMAND_DISCONNECT (100)\n");
@@ -209,10 +218,10 @@ int client_circuit_free () {
 		gnutls_deinit (client_circuit.session);
 		return -1;	
 	}
-
+	
 	close (client_circuit.relay1_socket_descriptor);
 	gnutls_deinit (client_circuit.session);
-
+	*/
 	return 0;
 }
 

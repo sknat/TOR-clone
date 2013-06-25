@@ -1,9 +1,11 @@
 #ifndef PORC_AES
 #define PORC_AES
 
+#include <gcrypt.h>
+
 int aesInit();
-void aesGenKey();
-void aesSetKey(char * aesSymKey, char * aesIniVector);
+int aesGenKey();
+int aesSetKey(char * aesSymKey, char * aesIniVector);
 int aesEncrypt (char * buffer, size_t buffer_len);
 int aesDecrypt(char * buffer, size_t buffer_len);
 void aesClose();
