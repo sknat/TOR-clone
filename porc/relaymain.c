@@ -46,14 +46,6 @@ int handle_connection(int client_socket_descriptor) {
 	}
 	printf ("Tls handshake was completed\n");
 	
-	// Record TLS session
-	ITEM_TLS_SESSION * tls_session;
-	int tls_session_id;
-	tls_session_id = ChainedListNew (&tls_session_list, (void**) &tls_session, sizeof(ITEM_TLS_SESSION));
-	tls_session->socket_descriptor = client_socket_descriptor;
-	tls_session->session = session;
-	
-	
 	// Start a PORC session
 	// wait for asking public key
 	PUB_KEY_REQUEST pub_key_request;
@@ -63,11 +55,13 @@ int handle_connection(int client_socket_descriptor) {
 		fprintf (stderr, "Error in public key request (router)\n");
 		return -1;
 	}
+	printf ("Public key requested\n");
 	if (pub_key_request.command != PUB_KEY_ASK)
 	{
 		fprintf (stderr, "Error : invalid public key request\n");
 		return -1;
 	}
+	printf ("Valid request\n");
 	//Send public Key
 	PUB_KEY_RESPONSE pub_key_response;
 	char * export_pub_key = malloc(PUBLIC_KEY_LEN);
@@ -76,6 +70,7 @@ int handle_connection(int client_socket_descriptor) {
 		fprintf (stderr, "Error exporting public key (router)\n");
 		return -1;
 	}
+	printf ("Exported public key\n");
 	pub_key_response.status = PUB_KEY_SUCCESS;
 	memcpy(pub_key_response.public_key,export_pub_key,PUBLIC_KEY_LEN);
 	if (gnutls_record_send (session, (char *)&pub_key_response, 
@@ -84,43 +79,62 @@ int handle_connection(int client_socket_descriptor) {
 		fprintf (stderr, "Error sending public key (router)\n");
 		return -1;
 	}
+	printf ("Sent public key\n");
 	free(export_pub_key);
 	//Wait for the symmetric key
 	CRYPT_SYM_KEY_RESPONSE crypt_sym_key_response;
-	if (gnutls_record_recv (session, (char *)&crypt_sym_key_response, 
-		sizeof (crypt_sym_key_response)) != sizeof (crypt_sym_key_response)) 
+	ret = gnutls_record_recv (session, (char *)&crypt_sym_key_response, 
+		sizeof (crypt_sym_key_response));
+	if (ret != sizeof (crypt_sym_key_response)) 
 	{
-		fprintf (stderr, "Error while awaiting symmetric key (router) size=%i\n",sizeof (crypt_sym_key_response));
+		fprintf (stderr, "Error while awaiting symmetric key (router) size=%i awaited=%i\n",sizeof (crypt_sym_key_response),ret);
 		return -1;	
 	}
+	printf ("We got sym key\n");
 	if (crypt_sym_key_response.status != CRYPT_SYM_KEY_SUCCESS)
 	{
 		fprintf (stderr, "Error : invalid symmetric key\n");
 		return -1;
 	}
-
-	// Record the PORC session
-	ITEM_PORC_SESSION *porc_session;
-	int id_porc_session;
-
-	id_porc_session = ChainedListNew (&porc_session_list, (void *)&porc_session, sizeof(ITEM_PORC_SESSION));
-	if (rsaDecrypt(crypt_sym_key_response.crypt_sym_key, porc_session->sym_key, privateKey)!=0)
+	printf ("Valid container for sym key\n");
+	
+	char sym_key[32];
+	if (rsaDecrypt(crypt_sym_key_response.crypt_sym_key,CRYPT_SYM_KEY_LEN, sym_key, privateKey)<0)
 	{
 		fprintf (stderr, "Error decrypting symmetric key\n");
 		return -1;
 	}
-	//Record into the structure
+	printf ("sym key decrypted\n");
+
+	// Record TLS session
+	ITEM_TLS_SESSION * tls_session;
+	int tls_session_id;
+	tls_session_id = ChainedListNew (&tls_session_list, (void**) &tls_session, sizeof(ITEM_TLS_SESSION));
+	tls_session->socket_descriptor = client_socket_descriptor;
+	tls_session->session = session;
+
+	printf ("Tls session recorded (first : %X, first[0] : %d, first->item : %X)\n",
+		(unsigned int)(tls_session_list.first), ((char *)(tls_session_list.first))[0],
+		((unsigned int *)(tls_session_list.first+1))[0]);
+
+	// Record the PORC session
+	ITEM_PORC_SESSION *porc_session;
+	int id_porc_session;
+	id_porc_session = ChainedListNew (&porc_session_list, (void *)&porc_session, sizeof(ITEM_PORC_SESSION));
 	porc_session->id_prev = pub_key_request.porc_session; 
 	porc_session->client_tls_session = tls_session_id;
 	porc_session->final = 1;
 	porc_session->server_tls_session = 0;
+	memcpy(porc_session->sym_key, sym_key, SYM_KEY_LEN);
 
-
+	printf ("Porc recorded\n");
+	sleep(2);
 	// Signaling a new available socket to the selecting thread
 	if (pthread_kill (selecting_thread, SIGUSR1) != 0) {
 		fprintf (stderr, "Signal sending failed\n");
 		return -1;
-	}	
+	}
+	printf ("Signal sent to thread\n");
 
 	return 0;
 }
@@ -158,17 +172,28 @@ void *start_accepting (void *arg) {
 int set_fds (int *nfds, fd_set *fds) {
 	CHAINED_LIST_LINK *c;
 	int max = -2;
-	int n=1;
+	int n=0;
 
+	printf ("Entering set_fds\n");
+	
 	FD_ZERO (fds);
 
+	printf ("set_fds : 1\n");
 	for (c=tls_session_list.first; c!=NULL; c=c->nxt) {
+		sleep(1);
+		printf ("set_fds : 2\n");
 		FD_SET (((ITEM_TLS_SESSION*)(c->item))->socket_descriptor, fds);
+		printf ("set_fds : 3\n");
 		n++;
 		if (((ITEM_TLS_SESSION*)(c->item))->socket_descriptor > max) {
+			printf ("set_fds : 4\n");
 			max = ((ITEM_TLS_SESSION*)(c->item))->socket_descriptor;
 		}
+		printf ("set_fds : 5\n");
 	}
+	
+	printf ("In the middle of set_fds\n");
+
 
 	for (c=socks_session_list.first; c!=NULL; c=c->nxt) {
 		FD_SET (((ITEM_SOCKS_SESSION*)(c->item))->target_socket_descriptor, fds);
@@ -179,6 +204,9 @@ int set_fds (int *nfds, fd_set *fds) {
 	}
 
 	*nfds = max + 1;
+	
+	printf ("Quiting set_fds\n");
+
 	return n;	
 }
 
@@ -286,11 +314,14 @@ int selecting() {
 		fprintf (stderr, "Impossible to prepare the signal mask.\n");
 		return -1;
 	}
-
+	printf ("Beginning to select\n");
 	for (;;) {
-		set_fds (&nfds, &read_fds);
-
+		while (set_fds (&nfds, &read_fds) <= 0) {
+			sleep(1);
+		}
+		printf ("Entering pselect (1)\n");
 		while((nbr = pselect(nfds, &read_fds, 0, 0, 0, &signal_set)) > 0) {
+			printf ("Ending pselect\n");
 			for (c=porc_session_list.first; c!=NULL; c=c->nxt) {
 				if (FD_ISSET (((ITEM_TLS_SESSION *)(c->item))->socket_descriptor, &read_fds)) {
 					int recvd = recv(((ITEM_TLS_SESSION *)(c->item))->socket_descriptor, buffer, BUF_SIZE, 0);
@@ -322,7 +353,9 @@ int selecting() {
 					}
 				}
 			}
+			printf ("entering pselect (2)\n");
 		}
+		printf ("pselect returned a negative integer\n");
 	}
 
 	return 0;

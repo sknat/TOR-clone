@@ -8,6 +8,7 @@
 #include <gnutls/gnutls.h>
 #include <gnutls/x509.h>
 #include <stdlib.h>
+#include "config.h"
 
 
 typedef struct ITEM_CLIENT
@@ -28,7 +29,7 @@ typedef struct ITEM_PORC_SESSION
 {
 	int id_prev;			// PORC client's id for the PORC session
 	int client_tls_session;
-	char sym_key[32];
+	char sym_key[SYM_KEY_LEN];
 	int final;			// set if the relay is the final relay (then server_tls_session undefined)
 	int server_tls_session;
 } 	ITEM_PORC_SESSION;

@@ -9,7 +9,7 @@ int aesSetKey(char * aesSymKey, char * aesIniVector);
 int aesEncrypt (char * buffer, size_t buffer_len);
 int aesDecrypt(char * buffer, size_t buffer_len);
 void aesClose();
-int aesImportKey (char * buffer);
+int aesImportKey (char * buffer, size_t len);
 void aesExportKey(char * txtBuffer);
 
 

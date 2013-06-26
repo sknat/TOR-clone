@@ -13,9 +13,11 @@ int porc_record_recv (gnutls_session_t session, char * msg, size_t size)
 	{
 		size_t cSize = size;
 		int i;
+		//printf("sending--%s\n",msg);
 		for (i=0 ; i<presentkeys ; i++)
 		{
-			aesImportKey(keytable[i]);
+			//printf("cryptstep%i\n",i);
+			aesImportKey(keytable[i],SYM_KEY_LEN);
 			cSize = aesDecrypt(msg,cSize);
 		}
 		return (gnutls_record_recv (session, msg, size));
@@ -27,7 +29,7 @@ int porc_record_send (gnutls_session_t session, char * msg, size_t size)
 		int i;
 		for (i=presentkeys ; i>0 ; i--)
 		{
-			aesImportKey(keytable[i]);
+			aesImportKey(keytable[i],SYM_KEY_LEN);
 			cSize = aesEncrypt(msg,cSize);
 		}
 		return (gnutls_record_send (session, msg, size));
@@ -152,6 +154,7 @@ int client_circuit_init () {
 			gnutls_deinit (session);
 			return -1;	
 		}
+		printf("public key received\n");
 		if (pub_key_response.status != PUB_KEY_SUCCESS)
 		{
 			fprintf (stderr, "Router[%i] returned Error when asked for public key\n",router_index);
@@ -159,20 +162,27 @@ int client_circuit_init () {
 			gnutls_deinit (session);
 			return -1;
 		}
+		printf("success\n");
 		//The public key is stored in pub_key_response->public_key
 		//Encrypt symmetricKey with publicKey
 		aesGenKey();
 		char * cryptClientSymKey = malloc(CRYPT_SYM_KEY_LEN);
+		printf("aeskeygen\n");
 		aesExportKey(keytable[router_index]);
+		printf("aesexport\n");
 		gcry_sexp_t pubkey;
-		if (rsaImportKey(pub_key_response.public_key, &pubkey )!=0)
+		printf("we got to import : %s\n",pub_key_response.public_key);
+		if (rsaImportKey((char*) (pub_key_response.public_key),PUBLIC_KEY_LEN, &pubkey )!=0)
 		{
 			fprintf (stderr, "Error importing public key given by router\n");
 			close (socket_descriptor);
 			gnutls_deinit (session);
 			return -1;
 		}
-		rsaEncrypt(keytable[router_index], cryptClientSymKey, pubkey );
+		printf("public key imported\n");
+		int cryptClientSymKeyLen = rsaEncrypt(keytable[router_index],SYM_KEY_LEN, cryptClientSymKey, pubkey );
+		
+		printf("public key crypted\n");
 		//Send Encripted SymmetricKey
 		CRYPT_SYM_KEY_RESPONSE crypt_sym_key_response;
 		crypt_sym_key_response.status = CRYPT_SYM_KEY_SUCCESS;
@@ -186,6 +196,7 @@ int client_circuit_init () {
 			return -1;	
 		}
 		presentkeys++;
+		printf("--------------Circuit CREATED--------- %i keys\n",presentkeys);
 		//Tunnel is now open to router[router_index]
 	}
 

@@ -25,12 +25,12 @@ int signal_init () {
 	sigemptyset(&signal_set);
 	act.sa_mask = signal_set;
 	act.sa_flags = 0;
-
+/*
 	if (sigaction (SIGINT, &act, NULL) != 0) {
 		fprintf (stderr, "Error in SIGINT handler initialisation\n");
 		return -1;
 	}
-	act.sa_handler = &signal_handler_newstream;
+	*/act.sa_handler = &signal_handler_newstream;
 	act.sa_mask = signal_set;
 	act.sa_flags = 0;
 	

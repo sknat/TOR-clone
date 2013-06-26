@@ -42,11 +42,11 @@ int rsaGenKey(gcry_sexp_t * publicKey, gcry_sexp_t * privateKey)
 	return 0;
 }
 
-int rsaImportKey(char * inBuffer, gcry_sexp_t * key)
+int rsaImportKey(char * inBuffer, size_t len, gcry_sexp_t * key)
 {
-	if(gcry_sexp_new(key, inBuffer, strlen(inBuffer), 1)) 
+	if(gcry_sexp_new(key, inBuffer, len, 1)) 
 	{
-		printf("Failed to import key");
+		fprintf(stderr,"Failed to import key\n");
 		return -1;
 	}
 	return 0;
@@ -62,7 +62,7 @@ int rsaExportKey(gcry_sexp_t * key, char * outBuffer)
 	return 0;
 }
  
-int rsaEncrypt(char * inBuffer, char * outBuffer, gcry_sexp_t publicKey) 
+int rsaEncrypt(char * inBuffer, size_t len, char * outBuffer, gcry_sexp_t publicKey) 
 {
 	gcry_sexp_t crypt_sexp;
 	gcry_sexp_t plain_sexp;
@@ -70,7 +70,7 @@ int rsaEncrypt(char * inBuffer, char * outBuffer, gcry_sexp_t publicKey)
 	//String to SExpression Conversion
 	gcry_mpi_t plain_mpi;
 	size_t nscanned;
-	if(gcry_mpi_scan(&plain_mpi, GCRYMPI_FMT_USG, inBuffer, strlen(inBuffer), &nscanned ) ) 	
+	if(gcry_mpi_scan(&plain_mpi, GCRYMPI_FMT_USG, inBuffer, len, &nscanned ) ) 	
 	{
 		printf( "Error while converting input from char to mpi, %i chars scanned",nscanned);
 		return -1;
@@ -88,22 +88,23 @@ int rsaEncrypt(char * inBuffer, char * outBuffer, gcry_sexp_t publicKey)
 		return -1;
 	}
 	// SExpression to String Conversion
-	if(!(gcry_sexp_sprint(crypt_sexp, OUT_MODE, outBuffer, gcry_sexp_sprint(crypt_sexp, OUT_MODE, NULL, 0)))) 
+	int outlen = gcry_sexp_sprint(crypt_sexp, OUT_MODE, NULL, 0);
+	if(!(gcry_sexp_sprint(crypt_sexp, OUT_MODE, outBuffer, outlen))) 
 	{
 		printf("Error while printing encrypted result");
 		return -1;
 	}
 	gcry_sexp_release(crypt_sexp);
 	gcry_sexp_release(plain_sexp);	
-	return 0;
+	return outlen;
 }
 
-int rsaDecrypt(char * inBuffer, char * outBuffer, gcry_sexp_t privateKey) 
+int rsaDecrypt(char * inBuffer, size_t len, char * outBuffer, gcry_sexp_t privateKey) 
 {
 	gcry_sexp_t plain_sexp;
 	gcry_sexp_t crypt_sexp;
 
-	if(gcry_sexp_new(&crypt_sexp, inBuffer, strlen(inBuffer), 1)) 
+	if(gcry_sexp_new(&crypt_sexp, inBuffer, len, 1)) 
 	{
 		printf("Error while reading the encrypted data");	
 		return -1;
@@ -113,7 +114,7 @@ int rsaDecrypt(char * inBuffer, char * outBuffer, gcry_sexp_t privateKey)
 		printf("Error during the decryption");
 		return -1;
 	}
-	if(!(gcry_sexp_sprint(plain_sexp, OUT_MODE, outBuffer, strlen(inBuffer)))) 
+	if(!(gcry_sexp_sprint(plain_sexp, OUT_MODE, outBuffer, len))) 
 	{
 		printf("Error while printing decryption result");
 		return -1;
@@ -121,7 +122,7 @@ int rsaDecrypt(char * inBuffer, char * outBuffer, gcry_sexp_t privateKey)
 
 	//removing quotes left by the S-Expression translation
 	int i;
-	int n = strlen(outBuffer)-4;
+	int n = len-2;
 	for (i = 0;i<n; i++)
 	{
 		outBuffer[i]=outBuffer[i+1];
@@ -130,7 +131,7 @@ int rsaDecrypt(char * inBuffer, char * outBuffer, gcry_sexp_t privateKey)
 	
 	gcry_sexp_release(crypt_sexp);
 	gcry_sexp_release(plain_sexp);
-	return 0;
+	return len-2;
 }
 
 int rsaInit()

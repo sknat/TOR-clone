@@ -114,7 +114,7 @@ void aesClose()
 	gcry_cipher_close(gcryCipherHd);
 }
 
-int aesImportKey (char * buffer)
+int aesImportKey (char * buffer, size_t len)
 {
 	if (iniVector != NULL) {
 		free (iniVector);
@@ -126,7 +126,7 @@ int aesImportKey (char * buffer)
 	iniVector = malloc(blkLength);
 
 	int i;
-	for(i=0; i<strlen(buffer);i++)
+	for(i=0; i<len;i++)
 	{
 		if (i<keyLength) keyRemind[i] = buffer[i];
 		else iniVector[i-keyLength] = buffer[i];

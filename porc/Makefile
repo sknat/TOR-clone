@@ -2,8 +2,8 @@ CC	= gcc
 CFLAGS	= -O0 -Wall $(INCLUDE) `pkg-config gnutls --cflags` `libgcrypt-config --cflags`
 LIBS	= `pkg-config gnutls --libs` `libgcrypt-config --libs`
 
-SRC	=	aes.c rsa.c signaling.c porc.c relay.c clientmain.c select.c sclient.c mytls.c socks.c mytcp.c directory.c setdir.c chainedlist.c
-OBJ	=	aes.o rsa.o signaling.o porc.o relay.o clientmain.o select.o sclient.o mytls.o socks.o mytcp.o directory.o setdir.o chainedlist.o
+SRC	=	aes.c rsa.c signaling.c porc.c relay.c relaymain.c clientmain.c select.c sclient.c mytls.c socks.c mytcp.c directory.c setdir.c chainedlist.c
+OBJ	=	aes.o rsa.o signaling.o porc.o relay.o relaymain.o clientmain.o select.o sclient.o mytls.o socks.o mytcp.o directory.o setdir.o chainedlist.o
 BINS	=	relay.exe client.exe sclient.exe directory.exe setdir.exe
 
 all:	$(BINS)

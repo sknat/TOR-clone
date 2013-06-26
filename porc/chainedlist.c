@@ -61,7 +61,9 @@ int ChainedListNew (CHAINED_LIST *p, void **item, int item_size)
 	CHAINED_LIST_LINK* el = malloc(sizeof(CHAINED_LIST_LINK));
 
 	el->id = p->index;
+	printf ("id = %d\n", el->id);
 	el->item = malloc(item_size);
+	printf ("item = %X\n", (unsigned int)(el->item));
 	el->nxt = p->first;
 	p->first = el;
 
