@@ -17,7 +17,7 @@ typedef struct MYSOCKET {
 
 	Returns socket descriptor in case of success, NULL otherwise.
 */
-void *connect_to_host(uint32_t ip, uint16_t port);
+int connect_to_host(uint32_t ip, uint16_t port);
 
 
 /*

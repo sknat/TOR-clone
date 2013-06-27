@@ -12,7 +12,7 @@
 
 #include "mytcp.h"
 
-void *connect_to_host(uint32_t ip, uint16_t port) {
+int connect_to_host(uint32_t ip, uint16_t port) {
 	struct sockaddr_in sockaddr_server;
 	int socket_descriptor;
 	int ret;
@@ -27,11 +27,11 @@ void *connect_to_host(uint32_t ip, uint16_t port) {
 	ret = connect(socket_descriptor, (struct sockaddr*)&sockaddr_server, sizeof(sockaddr_server));
 	if (ret != 0) {
 		printf ("Connection to target failed in function connect_to_host()\n");
-		return NULL;
+		return -1;
 	}
 	printf ("Connection to target succeded\n");
 
-	return (void *)socket_descriptor;
+	return socket_descriptor;
 }
 
 int create_listen_socket(int port) {

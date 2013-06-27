@@ -202,7 +202,7 @@ int set_fds (int *nfds, fd_set *fds) {
 
 
 
-int process_porc_packet(char *buffer, int n, int tls_session_id) {
+int process_porc_packet(int tls_session_id) {
 	
 	ITEM_TLS_SESSION * tls_session;
 	gnutls_session_t session;
@@ -220,7 +220,7 @@ int process_porc_packet(char *buffer, int n, int tls_session_id) {
 	}
 
 	// Read the remainder of the packet
-	//char *buffer = malloc (length-sizeof(length));
+	char *buffer = malloc (length-sizeof(length));
 	if (gnutls_record_recv (session, buffer, length-sizeof(length))
 		!= length-sizeof (length))
 	{
@@ -229,7 +229,7 @@ int process_porc_packet(char *buffer, int n, int tls_session_id) {
 	}
 
 	int direction = ((int *)buffer)[0];		// Read the direction
-	int porc_id = ((int *)buffer)[1];		// Read the PORC session
+	int porc_received_id = ((int *)buffer)[1];		// Read the PORC session
 
 	ITEM_PORC_SESSION * porc_session;
 	
@@ -239,7 +239,7 @@ int process_porc_packet(char *buffer, int n, int tls_session_id) {
 		CHAINED_LIST_LINK *c;
 		for (c=porc_session_list.first; c!=NULL; c=c->nxt) {
 			//If we know it as a previous id (find it in our list)
-			if ((((ITEM_PORC_SESSION*)(c->item))->id_prev) == porc_id)
+			if ((((ITEM_PORC_SESSION*)(c->item))->id_prev) == porc_received_id)
 			{
 				porc_session = (ITEM_PORC_SESSION*)(c->item);
 				if (porc_session->client_tls_session != tls_session_id)
@@ -272,30 +272,71 @@ int process_porc_packet(char *buffer, int n, int tls_session_id) {
 						return -1;
 					}
 				} 
-				else 
+				else //IF we are the final one
 				{
-					char * message;
+					char * message = malloc(newsize);
 					memcpy(message,buffer+2*sizeof(int),newsize);
 					int command = ((int* )message)[0];
 					if (command == PORC_COMMAND_TRANSMIT)
 					{
-						//TODO
+						ITEM_TLS_SESSION * tls_session;
+						ChainedListFind (&tls_session_list, porc_session->server_tls_session , (void **) &tls_session);
+						if (gnutls_record_send (tls_session->session, (char *)buffer+sizeof(int), 
+							newsize-sizeof(int)) != newsize-sizeof(int))
+						{
+							fprintf (stderr, "Error transmitting final message (final node)\n");
+							return -1;
+						}
 					}
 					if (command == PORC_COMMAND_OPEN_SOCKS)
 					{
-						int open_porc_ip = ((int* )message)[1];					
+						uint32_t open_socks_ip = ntohl(*((uint32_t* )(message+4)));
+						uint16_t open_socks_port = ntohl(*((uint16_t* )(message+8)));
+						uint32_t open_socks_prev_id = ntohl(*((uint32_t* )(message+10)));
+						int target_socket_descriptor = connect_to_host(htonl(open_socks_ip), htons(open_socks_port));
+						if (target_socket_descriptor < 0)
+						{
+							fprintf (stderr, "Error connecting to host - socks - (final node)\n");
+							return -1;
+						}
+					ITEM_SOCKS_SESSION * socks_session;
+					ChainedListNew(&socks_session_list, (void **)&socks_session, sizeof(ITEM_SOCKS_SESSION));
+					socks_session->id_prev = open_socks_prev_id;
+					socks_session->client_porc_session = c->id;
+					socks_session->target_socket_descriptor = target_socket_descriptor;
 					}
 					if (command == PORC_COMMAND_OPEN_PORC)
 					{
-						int open_socks_ip = ((int* )message)[1];
+						uint32_t open_porc_ip = ntohl(*((uint32_t* )(message+4)));
+						uint16_t open_porc_port = ntohl(*((uint16_t* )(message+8)));
+						gnutls_session_t gnutls_session;
+						int tls_socket_descriptor;
+						if (mytls_client_session_init (htonl(open_porc_ip), htons(open_porc_port), 
+							&gnutls_session, &tls_socket_descriptor) < 0) 
+						{
+							fprintf (stderr, "Error Connecting tls for router\n");
+							return -1;
+						}
+						ITEM_TLS_SESSION * tls_session;
+						int tls_session_id = ChainedListNew(&tls_session_list, (void **)&tls_session, sizeof(ITEM_TLS_SESSION));
+						if (tls_session_id<0)
+						{
+							fprintf (stderr, "ChainList Errror\n");
+							return -1;
+						}
+						tls_session->socket_descriptor = tls_socket_descriptor;
+						tls_session->session = gnutls_session;
+						
+						porc_session->server_tls_session = tls_session_id;
+						porc_session->final = 0;
 					}
 					if (command == PORC_COMMAND_CLOSE_SOCKS)
 					{
-					
+						//
 					}
 					if (command == PORC_COMMAND_CLOSE_PORC)
 					{
-					
+						//
 					}
 				}
 				return 0;
@@ -308,7 +349,7 @@ int process_porc_packet(char *buffer, int n, int tls_session_id) {
 		for (c=porc_session_list.first; c!=NULL; c=c->nxt) 
 		{
 			//If we know it as a previous id (find it in our list)
-			if ((((ITEM_PORC_SESSION*)(c->item))->id_prev) == porc_id)//########PREV?
+			if (c->id == porc_received_id)
 			{
 				porc_session = (ITEM_PORC_SESSION*)(c->item);
 				if (porc_session->client_tls_session != tls_session_id)
@@ -352,7 +393,7 @@ int process_porc_packet(char *buffer, int n, int tls_session_id) {
 	return -1;
 }
 
-int send_to_porc(char *buffer, int n, int socks_session_id) {
+int send_to_porc(int socks_session_id) {
 	// Send a packet from a target to a relay.
 
 
@@ -363,7 +404,6 @@ int selecting() {
 	fd_set read_fds;
 	int ret, nbr;
 	int nfds;
-	char buffer[BUF_SIZE+1];
 	CHAINED_LIST_LINK *c;
 	sigset_t signal_set_tmp, signal_set;
 
@@ -386,14 +426,7 @@ int selecting() {
 		while((nbr = pselect(nfds, &read_fds, 0, 0, 0, &signal_set)) > 0) {
 			for (c=porc_session_list.first; c!=NULL; c=c->nxt) {
 				if (FD_ISSET (((ITEM_TLS_SESSION *)(c->item))->socket_descriptor, &read_fds)) {
-					int recvd = recv(((ITEM_TLS_SESSION *)(c->item))->socket_descriptor, buffer, BUF_SIZE, 0);
-					if(recvd <= 0) {
-						fprintf (stderr, "Stop (100), %d\n", c->id);
-						return -1;
-					}
-					buffer [recvd] = '\0';
-					printf ("Receiving from client (%d bytes) : %s\n", recvd, buffer);
-					if (process_porc_packet(buffer, recvd, c->id)!=0) {
+					if (process_porc_packet(c->id)!=0) {
 						fprintf (stderr, "Stop (250), %d\n", c->id);
 						return -1;
 					}
@@ -401,15 +434,7 @@ int selecting() {
 			}
 			for (c=socks_session_list.first; c!=NULL; c=c->nxt) {
 				if (FD_ISSET (((ITEM_SOCKS_SESSION*)(c->item))->target_socket_descriptor, &read_fds)) {
-					int recvd = recv(((ITEM_SOCKS_SESSION*)(c->item))->target_socket_descriptor,
-						buffer, BUF_SIZE, 0);
-					if(recvd <= 0) {
-						fprintf (stderr, "Stop (120), %d\n", c->id);
-						return -1;
-					}
-					buffer [recvd] = '\0';
-					printf ("Receiving from target (%d bytes) : %s\n", recvd, buffer);
-					if (send_to_porc(buffer, recvd, c->id)!=0) {
+					if (send_to_porc(c->id)!=0) {
 						fprintf (stderr, "Stop (270), %d\n", c->id);
 						return -1;
 					}

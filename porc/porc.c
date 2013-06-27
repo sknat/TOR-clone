@@ -8,28 +8,82 @@ int presentkeys = 0;
 
 MYSOCKET *list_relays = NULL;
 
-int porc_record_recv (gnutls_session_t session, char * msg, size_t size)
+int porc_record_recv (gnutls_session_t session, char * msg, size_t expectedsize)
 	{
-		size_t cSize = size;
-		int i;
-		for (i=0 ; i<presentkeys ; i++)
+		if (presentkeys!=0)
 		{
-			aesImportKey(keytable[i],SYM_KEY_LEN);
-			cSize = aesDecrypt(msg,cSize);
+			int size;
+			if (gnutls_record_recv (session, (char*) &size , sizeof(int))!=sizeof(int))
+			{
+				fprintf (stderr, "Incorrect expected size to be received\n");
+				return -1;
+			}
+			if (expectedsize!=size)
+			{
+				fprintf (stderr, "Incorrect size, not that expected\n");
+				return -1;
+			}
+			char * in = malloc(size);
+			if(gnutls_record_recv (session, in, size)!=size)
+			{
+				fprintf (stderr, "Incorrect size, not that expected\n");
+				return -1;
+			}
+			memcpy(msg,in+2*sizeof(int),size-2*sizeof(int));
+			size = size - 2*sizeof(int);
+			int i;			
+			for (i=0 ; i<presentkeys ; i++)
+			{
+				aesImportKey(keytable[i],SYM_KEY_LEN);
+				size = aesDecrypt(msg,size);
+			}
+			return size;
 		}
-		return (gnutls_record_recv (session, msg, size));
+		else
+		{
+			int i;
+			gnutls_record_recv (session, msg, expectedsize);
+			for (i=0 ; i<presentkeys ; i++)
+			{
+				aesImportKey(keytable[i],SYM_KEY_LEN);
+				expectedsize = aesDecrypt(msg,expectedsize);
+			}
+			return expectedsize;
+		}
 	}
 	
 int porc_record_send (gnutls_session_t session, char * msg, size_t size)
 	{
-		size_t cSize = size;
-		int i;
-		for (i=presentkeys ; i>0 ; i--)
+		if (presentkeys!=0)
 		{
-			aesImportKey(keytable[i],SYM_KEY_LEN);
-			cSize = aesEncrypt(msg,cSize);
+			int i;
+			for (i=presentkeys ; i>0 ; i--)
+			{
+				aesImportKey(keytable[i],SYM_KEY_LEN);
+				size = aesEncrypt(msg,size);
+			}
+			char * out = malloc(size+2*sizeof(int));
+			((int *)out)[0] = PORC_DIRECTION_UP;
+			((int *)out)[1] = 0;
+			memcpy(out+2*sizeof(int),msg,size);
+			size = size+2;
+			if (gnutls_record_send (session, (char*) size , sizeof(size))!=sizeof(size))
+			{
+				fprintf (stderr, "Incorrect expected size to be sent\n");
+				return -1;
+			}
+			return (gnutls_record_send (session, msg, size));
 		}
-		return (gnutls_record_send (session, msg, size));
+		else
+		{
+			int i;
+			for (i=presentkeys ; i>0 ; i--)
+			{
+				aesImportKey(keytable[i],SYM_KEY_LEN);
+				size = aesEncrypt(msg,size);
+			}
+			return (gnutls_record_send (session, msg, size));
+		}
 	}
 
 
@@ -55,7 +109,7 @@ int client_circuit_init () {
 
 	directory_request.command = DIRECTORY_ASK;
 
-	if (porc_record_send (session, (char *)&directory_request, 
+	if (gnutls_record_send (session, (char *)&directory_request, 
 		sizeof (directory_request)) != sizeof (directory_request)) 
 	{
 		fprintf (stderr, "directory request error (100)\n");
@@ -64,7 +118,7 @@ int client_circuit_init () {
 		return -1;	
 	}
 
-	if (porc_record_recv (session, (char *)&directory_response, 
+	if (gnutls_record_recv (session, (char *)&directory_response, 
 		sizeof (directory_response)) != sizeof (directory_response))
 	{
 		fprintf (stderr, "directory request error (200)\n");
@@ -89,7 +143,7 @@ int client_circuit_init () {
 	nbr_relays = directory_response.nbr;
 	list_relays = (void *)malloc(sizeof(MYSOCKET)*nbr_relays);
 
-	if (porc_record_recv (session, (char *)list_relays, sizeof(MYSOCKET)*nbr_relays)
+	if (gnutls_record_recv (session, (char *)list_relays, sizeof(MYSOCKET)*nbr_relays)
 		!= sizeof(MYSOCKET)*nbr_relays)
 	{
 		fprintf (stderr, "directory request error (400)\n");
