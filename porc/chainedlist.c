@@ -70,7 +70,8 @@ int ChainedListNew (CHAINED_LIST *p, void **item, int item_size)
 	p->index++;
 	p->length++;
 
-	*item = &(el->item);
+	
+	*item = el->item;
 	
 	return el->id;
 }

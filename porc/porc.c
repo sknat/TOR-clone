@@ -1,6 +1,5 @@
 #include "porc.h"
 
-
 int nbr_relays = 0;
 int nbr_tunnel_relays = 3;
 char keytable[MAX_TUNNEL_RELAYS][SYM_KEY_LEN];
@@ -13,10 +12,8 @@ int porc_record_recv (gnutls_session_t session, char * msg, size_t size)
 	{
 		size_t cSize = size;
 		int i;
-		//printf("sending--%s\n",msg);
 		for (i=0 ; i<presentkeys ; i++)
 		{
-			//printf("cryptstep%i\n",i);
 			aesImportKey(keytable[i],SYM_KEY_LEN);
 			cSize = aesDecrypt(msg,cSize);
 		}
@@ -180,7 +177,7 @@ int client_circuit_init () {
 			return -1;
 		}
 		printf("public key imported\n");
-		int cryptClientSymKeyLen = rsaEncrypt(keytable[router_index],SYM_KEY_LEN, cryptClientSymKey, pubkey );
+		rsaEncrypt(keytable[router_index],SYM_KEY_LEN, cryptClientSymKey, pubkey );
 		
 		printf("public key crypted\n");
 		//Send Encripted SymmetricKey
@@ -207,32 +204,40 @@ int client_circuit_init () {
 }
 
 int client_circuit_free () {
-	/*//PORC_COMMAND porc_command = PORC_COMMAND_DISCONNECT;
-
-	if (porc_record_send (client_circuit.session, (char *)&porc_command, sizeof (porc_command)) != sizeof (porc_command)) {
-		fprintf (stderr, "Error PORC_COMMAND_DISCONNECT (100)\n");
-		close (client_circuit.relay1_socket_descriptor);
-		gnutls_deinit (client_circuit.session);
-		return -1;	
+	while (presentkeys>0)
+	{
+		char * msg = malloc(sizeof(int));
+		((int*)msg)[0] = PORC_COMMAND_CLOSE_PORC;
+		size_t cSize = sizeof(int);
+		int i;
+		for (i=presentkeys ; i>0 ; i--)
+		{
+			aesImportKey(keytable[i],SYM_KEY_LEN);
+			cSize = aesEncrypt(msg,cSize);
+		}
+		char * hd_msg = malloc(cSize+2*sizeof(int));
+		((int*)hd_msg)[0] = PORC_DIRECTION_UP;
+		((int*)hd_msg)[1] = 0; //ID of packet
+		memcpy(hd_msg+2*sizeof(int),msg,cSize);
+		if (gnutls_record_send (client_circuit.session, (char *)&cSize, sizeof(int)) 
+			!= sizeof(int)) {
+			fprintf (stderr, "Error closing circuit -- sending size of packet\n");
+			close (client_circuit.relay1_socket_descriptor);
+			gnutls_deinit (client_circuit.session);
+			return -1;	
+		}
+		if (gnutls_record_send (client_circuit.session, hd_msg, cSize+2*sizeof(int)) 
+			!= cSize+2*sizeof(int)) {
+			fprintf (stderr, "Error closing circuit -- sending packet\n");
+			close (client_circuit.relay1_socket_descriptor);
+			gnutls_deinit (client_circuit.session);
+			return -1;	
+		}
+	presentkeys--;
 	}
-
-	if (porc_record_send (client_circuit.session, (char *)&porc_command, sizeof (porc_command)) != sizeof (porc_command)) {
-		fprintf (stderr, "Error PORC_COMMAND_DISCONNECT (200)\n");
-		close (client_circuit.relay1_socket_descriptor);
-		gnutls_deinit (client_circuit.session);
-		return -1;	
-	}
-
-	if (porc_record_send (client_circuit.session, (char *)&porc_command, sizeof (porc_command)) != sizeof (porc_command)) {
-		fprintf (stderr, "Error PORC_COMMAND_DISCONNECT (300)\n");
-		close (client_circuit.relay1_socket_descriptor);
-		gnutls_deinit (client_circuit.session);
-		return -1;	
-	}
-	
 	close (client_circuit.relay1_socket_descriptor);
 	gnutls_deinit (client_circuit.session);
-	*/
+
 	return 0;
 }
 

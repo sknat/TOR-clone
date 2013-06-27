@@ -1,8 +1,9 @@
-/*
-	relay - PORC relay
+/***********************************************************************************
+	Relay - PORC relay
 
 	The PORC relay transfers a stream to another relay or to the target.
-*/
+
+***********************************************************************************/
 
 #include "relaymain.h"
 
@@ -19,10 +20,15 @@ CHAINED_LIST tls_session_list;
 CHAINED_LIST porc_session_list;
 CHAINED_LIST socks_session_list;
 
+/* ################################################################################
 
-/*
+							ACCEPTING CONNECTIONS
+
+################################################################################ */
+
+/***********************************************************************************
 	handle_connection - Sets up a TLS and a PORC session with a client or relay.
-*/
+***********************************************************************************/
 int handle_connection(int client_socket_descriptor) {
 	gnutls_session_t session;
 	int ret;
@@ -98,7 +104,7 @@ int handle_connection(int client_socket_descriptor) {
 	}
 	printf ("Valid container for sym key\n");
 	
-	char sym_key[32];
+	char sym_key[SYM_KEY_LEN];
 	if (rsaDecrypt(crypt_sym_key_response.crypt_sym_key,CRYPT_SYM_KEY_LEN, sym_key, privateKey)<0)
 	{
 		fprintf (stderr, "Error decrypting symmetric key\n");
@@ -108,15 +114,11 @@ int handle_connection(int client_socket_descriptor) {
 
 	// Record TLS session
 	ITEM_TLS_SESSION * tls_session;
-	int tls_session_id;
-	tls_session_id = ChainedListNew (&tls_session_list, (void**) &tls_session, sizeof(ITEM_TLS_SESSION));
+	int tls_session_id = ChainedListNew (&tls_session_list, (void**) &tls_session, sizeof(ITEM_TLS_SESSION));
 	tls_session->socket_descriptor = client_socket_descriptor;
 	tls_session->session = session;
 
-	printf ("Tls session recorded (first : %X, first[0] : %d, first->item : %X)\n",
-		(unsigned int)(tls_session_list.first), ((char *)(tls_session_list.first))[0],
-		((unsigned int *)(tls_session_list.first+1))[0]);
-
+		
 	// Record the PORC session
 	ITEM_PORC_SESSION *porc_session;
 	int id_porc_session;
@@ -134,13 +136,13 @@ int handle_connection(int client_socket_descriptor) {
 		fprintf (stderr, "Signal sending failed\n");
 		return -1;
 	}
-	printf ("Signal sent to thread\n");
+	printf ("----------DONE ACCEPTING CONNECTION---------\n");
 
 	return 0;
 }
-
-
-
+/***********************************************************************************
+	Accepting : Method to be runned in a thread that accepts new connections
+***********************************************************************************/
 int accepting (int listen_socket_descriptor) {
 	struct sockaddr_in sockaddr_client;
 	int client_socket_descriptor;
@@ -149,7 +151,7 @@ int accepting (int listen_socket_descriptor) {
 
 	for (;;) {
 		if ((client_socket_descriptor = accept(listen_socket_descriptor, (struct sockaddr *) &sockaddr_client, &length)) > 0) {
-			printf ("New client %d\n", client_socket_descriptor);
+			printf ("New client , socket_descriptor = '%d'\n", client_socket_descriptor);
 			ret = handle_connection (client_socket_descriptor);
 			if (ret != 0) {
 				break;
@@ -166,34 +168,26 @@ void *start_accepting (void *arg) {
 }
 	
 
+/* ################################################################################
 
+							PROCESSING CONNECTIONS
 
+################################################################################ */
 
 int set_fds (int *nfds, fd_set *fds) {
 	CHAINED_LIST_LINK *c;
 	int max = -2;
 	int n=0;
-
-	printf ("Entering set_fds\n");
 	
-	FD_ZERO (fds);
-
-	printf ("set_fds : 1\n");
-	for (c=tls_session_list.first; c!=NULL; c=c->nxt) {
-		sleep(1);
-		printf ("set_fds : 2\n");
+	FD_ZERO (fds); //Initialize set
+	
+	for (c=tls_session_list.first; c!= NULL; c=c->nxt) {
 		FD_SET (((ITEM_TLS_SESSION*)(c->item))->socket_descriptor, fds);
-		printf ("set_fds : 3\n");
 		n++;
 		if (((ITEM_TLS_SESSION*)(c->item))->socket_descriptor > max) {
-			printf ("set_fds : 4\n");
 			max = ((ITEM_TLS_SESSION*)(c->item))->socket_descriptor;
 		}
-		printf ("set_fds : 5\n");
 	}
-	
-	printf ("In the middle of set_fds\n");
-
 
 	for (c=socks_session_list.first; c!=NULL; c=c->nxt) {
 		FD_SET (((ITEM_SOCKS_SESSION*)(c->item))->target_socket_descriptor, fds);
@@ -202,18 +196,15 @@ int set_fds (int *nfds, fd_set *fds) {
 			max = ((ITEM_SOCKS_SESSION*)(c->item))->target_socket_descriptor;
 		}
 	}
-
 	*nfds = max + 1;
-	
-	printf ("Quiting set_fds\n");
-
 	return n;	
 }
 
 
 
 int process_porc_packet(char *buffer, int n, int tls_session_id) {
-	/*ITEM_TLS_SESSION * tls_session;
+	
+	ITEM_TLS_SESSION * tls_session;
 	gnutls_session_t session;
 	
 	ChainedListFind (&tls_session_list, tls_session_id, (void**)&tls_session);
@@ -240,25 +231,72 @@ int process_porc_packet(char *buffer, int n, int tls_session_id) {
 	int direction = ((int *)buffer)[0];		// Read the direction
 	int porc_id = ((int *)buffer)[1];		// Read the PORC session
 
-	int sock_session_id;
-	ITEM_SOCKS_SESSION *sock_session;
+	ITEM_PORC_SESSION * porc_session;
+	
 	if (direction == PORC_DIRECTION_DOWN) {
 		// We must decode
 
 		CHAINED_LIST_LINK *c;
-		for (c=socks_session_list.first; c!=NULL; c=c->nxt) {
-			if ((((ITEM_SOCKS_SESSION*)(c->item))->id_prev == porc_id)// &&
-				//(((ITEM_SOCKS_SESSION*)(c->item))->client_tls_session == tls_session_id))
-			){
-				sock_session_id = c->id;
-				sock_session = (ITEM_PORC_SESSION *)(c->item);
-
-				if (sock_session->final == 0) {
+		for (c=porc_session_list.first; c!=NULL; c=c->nxt) {
+			//If we know it as a previous id (find it in our list)
+			if ((((ITEM_PORC_SESSION*)(c->item))->id_prev) == porc_id)
+			{
+				porc_session = (ITEM_PORC_SESSION*)(c->item);
+				if (porc_session->client_tls_session != tls_session_id)
+				{
+					fprintf (stderr, "Wrong tls session\n");
+					return -1;
+				}
+				if(aesImportKey(porc_session->sym_key,SYM_KEY_LEN)!=0)
+					{
+						fprintf(stderr,"Failed to import SYMKEY for encoding/decoding message (router)");
+						return -1;
+					}
+				size_t newsize = aesDecrypt(buffer+2*sizeof(int),length-sizeof(length)-2*sizeof(int));
+				if (porc_session->final == 0) 
+				{
+					length = newsize + 2*sizeof(int)+sizeof(length);
 					// Decode and send to the next relay
-					decodage(buffer+2*sizeof(int), ...);
-
-				} else {
-					// Decode and read the command
+					//Rewrite paquet
+					((int *)buffer)[1] = tls_session_id;	
+					if (gnutls_record_send (session, (char *)&length, sizeof(length)) 
+						!= sizeof(length))
+					{
+						fprintf (stderr, "Error forwarding length to next relay (router)\n");
+						return -1;
+					}
+					if (gnutls_record_send (session, (char *)&buffer, length-sizeof(length)) 
+						!= length-sizeof(length))
+					{
+						fprintf (stderr, "Error forwarding message to next relay (router)\n");
+						return -1;
+					}
+				} 
+				else 
+				{
+					char * message;
+					memcpy(message,buffer+2*sizeof(int),newsize);
+					int command = ((int* )message)[0];
+					if (command == PORC_COMMAND_TRANSMIT)
+					{
+						//TODO
+					}
+					if (command == PORC_COMMAND_OPEN_SOCKS)
+					{
+						int open_porc_ip = ((int* )message)[1];					
+					}
+					if (command == PORC_COMMAND_OPEN_PORC)
+					{
+						int open_socks_ip = ((int* )message)[1];
+					}
+					if (command == PORC_COMMAND_CLOSE_SOCKS)
+					{
+					
+					}
+					if (command == PORC_COMMAND_CLOSE_PORC)
+					{
+					
+					}
 				}
 				return 0;
 			}
@@ -267,24 +305,50 @@ int process_porc_packet(char *buffer, int n, int tls_session_id) {
 		// We must encode
 
 		CHAINED_LIST_LINK *c;
-		for (c=socks_session_list.first; c!=NULL; c=c->nxt) {
-			if ((c->id == porc_id)) &&
-				(((ITEM_SOCKS_SESSION*)(c->item))->server_tls_session == tls_session_id))
+		for (c=porc_session_list.first; c!=NULL; c=c->nxt) 
+		{
+			//If we know it as a previous id (find it in our list)
+			if ((((ITEM_PORC_SESSION*)(c->item))->id_prev) == porc_id)//########PREV?
 			{
-				sock_session_id = c->id;
-				sock_session = (ITEM_SOCKS_SESSION *)(c->item);
-
+				porc_session = (ITEM_PORC_SESSION*)(c->item);
+				if (porc_session->client_tls_session != tls_session_id)
+				{
+					fprintf (stderr, "Wrong tls session\n");
+					return -1;
+				}
 				// Encode and send to the previous relay
-
-				return 0
+				if(aesImportKey(porc_session->sym_key,SYM_KEY_LEN)!=0)
+					{
+						fprintf(stderr,"Failed to import SYMKEY for encoding/decoding message (router)");
+						return -1;
+					}
+				size_t newsize = aesEncrypt(buffer+2*sizeof(int),length-sizeof(length)-2*sizeof(int));
+				length = newsize + 2*sizeof(int)+sizeof(length);
+				// Encode and send to the next relay
+				((int *)buffer)[1] = porc_session->id_prev;	
+					if (gnutls_record_send (session, (char *)&length, sizeof(length)) 
+						!= sizeof(length))
+					{
+						fprintf (stderr, "Error forwarding length to next relay (router)\n");
+						return -1;
+					}
+					if (gnutls_record_send (session, (char *)&buffer, length-sizeof(length)) 
+						!= length-sizeof(length))
+					{
+						fprintf (stderr, "Error forwarding message to next relay (router)\n");
+						return -1;
+					}				
 			}
+			return 0;
 		}
-	} else {
+	}
+	else 
+	{
 		fprintf (stderr, "Incorrect direction\n");
 		return -1;
 	}
 
-	fprintf (stderr, "Incorrect PORC session.\n");*/
+	fprintf (stderr, "Incorrect PORC session.\n");
 	return -1;
 }
 
@@ -319,9 +383,7 @@ int selecting() {
 		while (set_fds (&nfds, &read_fds) <= 0) {
 			sleep(1);
 		}
-		printf ("Entering pselect (1)\n");
 		while((nbr = pselect(nfds, &read_fds, 0, 0, 0, &signal_set)) > 0) {
-			printf ("Ending pselect\n");
 			for (c=porc_session_list.first; c!=NULL; c=c->nxt) {
 				if (FD_ISSET (((ITEM_TLS_SESSION *)(c->item))->socket_descriptor, &read_fds)) {
 					int recvd = recv(((ITEM_TLS_SESSION *)(c->item))->socket_descriptor, buffer, BUF_SIZE, 0);
@@ -353,7 +415,9 @@ int selecting() {
 					}
 				}
 			}
-			printf ("entering pselect (2)\n");
+			while (set_fds (&nfds, &read_fds) <= 0) {
+			sleep(1);
+			}
 		}
 		printf ("pselect returned a negative integer\n");
 	}
@@ -362,13 +426,10 @@ int selecting() {
 }
 
 
-
-
-
-
 /*
 	main - Initializes a TLS server and starts a thread for every client.
 */
+
 int main (int argc, char **argv)
 {
 	int listen_socket_descriptor;
@@ -410,9 +471,9 @@ int main (int argc, char **argv)
 	ChainedListInit (&tls_session_list);
 	ChainedListInit (&porc_session_list);
 	ChainedListInit (&socks_session_list);
-
+	//Starts the selecting Thread
 	selecting_thread = pthread_self ();
-
+	//Starts the accepting Thread
 	pthread_attr_t attr;
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);

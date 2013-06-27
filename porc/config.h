@@ -8,7 +8,8 @@
 #define CERT_FILE	"./cert"
 #define KEY_FILE	"./key"
 #define ROOT_CA_FILE	"./root-ca.pem"
-#define LIST_RELAYS	"./listrelays"
+#define FILE_LIST_RELAYS	"./listrelays"
+#define PATH_LIST_RELAYS	"./directory/listrelays"
 
 #define CLIENT_PORT	5555
 #define CLIENT_IP	"127.0.0.1"

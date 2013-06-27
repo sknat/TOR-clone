@@ -42,3 +42,5 @@ sclient.exe:	sclient.o
 
 clean:
 	rm -f $(OBJ) *~ $(BINS)
+	rm -f ./*.stackdump
+	rm -f ./*/*.stackdump

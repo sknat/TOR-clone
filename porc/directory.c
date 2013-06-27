@@ -126,9 +126,9 @@ int main (void)
 	int file;
 	struct stat fileinfo;
 
-	ret = stat(LIST_RELAYS, &fileinfo);
+	ret = stat(FILE_LIST_RELAYS, &fileinfo);
 	if (ret != 0) {
-		fprintf (stderr, "Impossible to find file \"%s\"\n", LIST_RELAYS);
+		fprintf (stderr, "Impossible to find file \"%s\"\n", FILE_LIST_RELAYS);
 		return -1;
 	}
 
@@ -136,10 +136,10 @@ int main (void)
 
 	list_relays = malloc (nbr_relays*sizeof(MYSOCKET));
 
-	file = open (LIST_RELAYS, O_RDONLY);
+	file = open (FILE_LIST_RELAYS, O_RDONLY);
 	if (file == -1) {
 		ret = errno;
-		fprintf (stderr, "Impossible to open \"%s\", errno = %d\n", LIST_RELAYS, ret);
+		fprintf (stderr, "Impossible to open \"%s\", errno = %d\n", FILE_LIST_RELAYS, ret);
 		free (list_relays);
 		return -1;
 	}
@@ -153,7 +153,7 @@ int main (void)
 
 	close (file);
 
-	printf ("%d trusted relays successfully read from file \"%s\"\n", nbr_relays, LIST_RELAYS);	
+	printf ("%d trusted relays successfully read from file \"%s\"\n", nbr_relays, FILE_LIST_RELAYS);	
 
 	if (mytls_server_init (DIRECTORY_PORT, &xcred, &priority_cache, &listen_socket_descriptor, &sockaddr_server, 0) != 0) {
 		return -1;

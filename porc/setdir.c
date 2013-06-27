@@ -52,9 +52,9 @@ int main() {
 		content[i].port = htons(port);
 	}
 
-	file = open (LIST_RELAYS, O_WRONLY | O_CREAT);
+	file = open (PATH_LIST_RELAYS, O_WRONLY | O_CREAT);
 	if (file == -1) {
-		fprintf (stderr, "Impossible to open \"%s\"\n", LIST_RELAYS);
+		fprintf (stderr, "Impossible to open \"%s\"\n", PATH_LIST_RELAYS);
 		free (content);
 		return -1;
 	}
@@ -65,10 +65,9 @@ int main() {
 		free (content);
 		return -1;
 	}
-
 	close (file);
 
 	free (content);
-	printf ("List of trusted relays successfully written in file \"%s\"\n", LIST_RELAYS);
+	printf ("List of trusted relays successfully written in file \"%s\"\n", PATH_LIST_RELAYS);
 	return 0;
 }
