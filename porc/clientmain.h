@@ -33,11 +33,10 @@ extern CHAINED_LIST socks_session_list;
 	CLIENT_CIRCUIT - Circuit information for the PORC client.
 */
 typedef struct CLIENT_CIRCUIT {
-	MYSOCKET relay1;
-	gnutls_session_t session;
+	gnutls_session_t relay1_gnutls_session;
 	int relay1_socket_descriptor;
-	MYSOCKET relay2;
-	MYSOCKET relay3;
+	gcry_cipher_hd_t gcry_cipher_hd[MAX_CIRCUIT_LENGTH];
+	int length;
 }	CLIENT_CIRCUIT;
 
 

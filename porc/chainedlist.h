@@ -22,7 +22,7 @@ typedef struct ITEM_CLIENT
 typedef struct ITEM_TLS_SESSION
 {
 	int socket_descriptor;
-	gnutls_session_t session;
+	gnutls_session_t gnutls_session;
 } 	ITEM_TLS_SESSION;
 
 

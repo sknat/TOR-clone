@@ -11,6 +11,16 @@ void *start_proxy(void *arg){
 }
 
 int main () {
+	// gcrypt initialisation
+	if (!gcry_check_version (GCRYPT_VERSION)) {
+		fprintf (stderr, "libgcrypt version mismatch\n");
+		return -1;
+	}
+	gcry_control (GCRYCTL_ENABLE_QUICK_RANDOM, 0);
+	gcry_control (GCRYCTL_DISABLE_SECMEM, 0);
+	gcry_control (GCRYCTL_INITIALIZATION_FINISHED, 0);	
+
+
 	if (signal_init () != 0) {
 		fprintf (stderr, "Error in signals initialisation\n");
 		return -1;
@@ -22,7 +32,7 @@ int main () {
 	}
 
 	// Set up the connection to the PORC network
-	if (client_circuit_init () != 0) {
+	if (client_circuit_init (3) != 0) {
 		fprintf (stderr, "Error in circuit initialisation\n");
 		gnutls_certificate_free_credentials (xcred);
 		gnutls_global_deinit ();
