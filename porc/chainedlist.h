@@ -12,25 +12,24 @@
 #include "config.h"
 
 
-typedef struct ITEM_CLIENT
+typedef struct
 {
-	int id;				// SOCKS session id
 	int client_socket_descriptor;	// SOCKS client socket descriptor
 } 	ITEM_CLIENT;
 
 
-typedef struct ITEM_TLS_SESSION
+typedef struct
 {
 	int socket_descriptor;
 	gnutls_session_t gnutls_session;
 } 	ITEM_TLS_SESSION;
 
 
-typedef struct ITEM_PORC_SESSION
+typedef struct
 {
 	int id_prev;			// PORC client's id for the PORC session
 	int client_tls_session;
-	char sym_key[SYM_KEY_LEN];
+	gcry_cipher_hd_t gcry_cipher_hd;
 	int final;			// set if the relay is the final relay (then server_tls_session undefined)
 	int server_tls_session;
 } 	ITEM_PORC_SESSION;
@@ -40,7 +39,7 @@ typedef struct ITEM_PORC_SESSION
 #define SOCKS_TO_RELAY		155
 
 // id is the local SOCKS session id
-typedef struct ITEM_SOCKS_SESSION
+typedef struct
 {
 	int id_prev;			// PORC client's id for the SOCKS session
 	int client_porc_session;	// PORC session used to communicate with the client
@@ -53,11 +52,12 @@ typedef struct ITEM_SOCKS_SESSION
 typedef struct CHAINED_LIST_LINK
 {
 	int id;
+	int complete;		// item can be read
 	void *item;
 	struct CHAINED_LIST_LINK *nxt;
 } 	CHAINED_LIST_LINK;
 
-typedef struct CHAINED_LIST
+typedef struct
 {
 	int index;		// >= max(ids) + 1
 	int length;
@@ -72,10 +72,14 @@ int ChainedListRemove (CHAINED_LIST* p, int id);
 
 int ChainedListFind (CHAINED_LIST* p, int id, void **item);
 
+int ChainedListComplete (CHAINED_LIST* p, int id);
+
 /*
 	A new link is allocated and a pointer to its content is given.
 */
 int ChainedListNew (CHAINED_LIST *p, void **item, int item_size);
+
+int ChainedListNext (CHAINED_LIST_LINK **p, void **item);
 
 void ChainedListClear (CHAINED_LIST *p);
 

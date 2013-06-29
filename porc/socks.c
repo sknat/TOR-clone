@@ -1,7 +1,7 @@
 #include "socks.h"
 
 /*
-	new_client - Initialize the PORC connection. This function is called once during the SOCKSv4 handshake.
+	new_client - Initialize a SOCKS connection. This function is called once during the SOCKSv4 handshake.
 
 	client_socket_descriptor - SOCKS client socket descriptor
 	ip - target ip
@@ -13,49 +13,52 @@ int new_client(int client_socket_descriptor, uint32_t ip, uint16_t port) {
 	PORC_COMMAND porc_command;
 	PORC_ACK porc_ack;
 	MYSOCKET target;
+	int socks_session_id;
 	ITEM_CLIENT *socks_session;
 
+	// Register a new SOCKS session
+	socks_session_id = ChainedListNew (&socks_session_list, &socks_session);
 
-	// PORC handshake
-// envoyer en plus un numéro de session
-	porc_command = PORC_COMMAND_OPEN_SOCKS;
-	if (gnutls_record_send (client_circuit.session, (char *)&porc_command, sizeof (porc_command)) != sizeof (porc_command)) {
-		fprintf (stderr, "Error PORC_COMMAND_OPEN_SOCKS (100)\n");
-		close (client_socket_descriptor);
-		return -1;	
-	}
+	// SOCKS handshake
 
-	target.ip = ip;
-	target.port = port;
-	if (gnutls_record_send (client_circuit.session, (char *)&target, sizeof (target))
-		!= sizeof (target))
+	PORC_COMMAND_OPEN_SOCKS_CONTENT porc_command_open_socks_content;
+	porc_command_open_socks_content.ip = ip;
+	porc_command_open_socks_content.port = port;
+	porc_command_open_socks_content.socks_session_id = socks_session_id;
+
+	if (porc_send (PORC_COMMAND_OPEN_SOCKS, (char *)&porc_command_open_socks_content,
+		sizeof (porc_command_open_socks_content)) != 0)
 	{
-		fprintf (stderr, "Error PORC_COMMAND_OPEN_SOCKS (200)\n");
+		fprintf (stderr, "Error PORC_COMMAND_OPEN_SOCKS (100)\n");
+		ChainedListDelete (&socks_session_list, socks_session_id);
 		close (client_socket_descriptor);
 		return -1;	
 	}
 
-	if (gnutls_record_recv (client_circuit.session, (char *)&porc_ack, sizeof (porc_ack))
-		!= sizeof (porc_ack))
+	int response_length;
+	PORC_RESPONSE_OPEN_SOCKS_CONTENT *porc_response_open_socks_content;
+	if (porc_recv (client_circuit.session, (char *)&porc_response_open_socks_content, &response_length) != 0)
 	{
 		fprintf (stderr, "Error PORC_COMMAND_OPEN_SOCKS (250)\n");
+		ChainedListDelete (&socks_session_list, socks_session_id);
 		close (client_socket_descriptor);
 		return -1;	
 	}
-
-	/*if (porc_ack != PORC_ACK_CONNECT_TARGET) {
+	if (porc_response_open_socks_content->status != PORC_STATUS_SUCCESS) {
 		printf ("Impossible to join target\n");
+		ChainedListDelete (&socks_session_list, socks_session_id);
 		close (client_socket_descriptor);
 		return 0;
-	}*/
+	}
+	if (porc_response_open_socks_content->socks_session_id !=socks_session_id) {
+		printf ("Wrong socks session id\n");
+		ChainedListDelete (&socks_session_list, socks_session_id);
+		close (client_socket_descriptor);
+		return 0;
+	}
 
-
-	// Record the PORC session
-
-	ChainedListNew (&socks_session_list, (void*)&socks_session, sizeof(ITEM_CLIENT));
-	socks_session->client_socket_descriptor = client_socket_descriptor;
-
-	return 1;
+	ChainedListComplete (&socks_session_list, socks_session_id);
+	return 0;
 }
 
 
@@ -78,7 +81,7 @@ int handle_connection(int client_socket_descriptor) {
 			return -1;}
 	}
 
-	if (new_client (client_socket_descriptor, req.ip_dst, ntohs(req.port)) == -1) {
+	if (new_client (client_socket_descriptor, ntohl(req.ip_dst), ntohs(req.port)) == -1) {
 		fprintf (stderr, "Failed to connect to target.\n");
 		return -1;
 	}

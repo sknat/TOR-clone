@@ -36,7 +36,7 @@ int do_proxy() {
 	fd_set read_fds;
 	int ret, nbr;
 	int nfds;
-	char buffer[BUF_SIZE+1];
+	char buffer[SOCKS_MAX_BUFFER_SIZE+1];
 	CHAINED_LIST_LINK *c;
 	sigset_t signal_set_tmp, signal_set;
 
@@ -60,7 +60,7 @@ int do_proxy() {
 
 		while((nbr = pselect(nfds, &read_fds, 0, 0, 0, &signal_set)) > 0) {
 			if (FD_ISSET (client_circuit.relay1_socket_descriptor, &read_fds)) {
-				int recvd = gnutls_record_recv(client_circuit.session, buffer, BUF_SIZE);
+				int recvd = gnutls_record_recv(client_circuit.session, buffer, SOCKS_MAX_BUFFER_SIZE);
 				if(recvd <= 0) {
 					fprintf (stderr, "Stop (50) on relay reception\n");
 					return -1;
@@ -74,7 +74,7 @@ int do_proxy() {
 			}
 			for (c=socks_session_list.first; c!=NULL; c=c->nxt) {
 				if (FD_ISSET (((ITEM_CLIENT*)(c->item))->client_socket_descriptor, &read_fds)) {
-					int recvd = recv(((ITEM_CLIENT*)(c->item))->client_socket_descriptor, buffer, BUF_SIZE, 0);
+					int recvd = recv(((ITEM_CLIENT*)(c->item))->client_socket_descriptor, buffer, SOCKS_MAX_BUFFER_SIZE, 0);
 					if(recvd <= 0) {
 						fprintf (stderr, "Stop (100), %d\n", c->id);
 						return -1;

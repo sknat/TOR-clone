@@ -3,83 +3,87 @@
 int nbr_relays = 0;
 MYSOCKET *list_relays = NULL;
 
-int porc_record_recv (gnutls_session_t session, char * msg, size_t expectedsize)
+int porc_recv (PORC_RESPONSE *porc_response, char *message, size_t *message_length)
+{
+	int porc_packet_size;
+	if (gnutls_record_recv (client_circuit.relay1_gnutls_session, (char*)&porc_packet_size , sizeof(porc_packet_size))
+		!= sizeof(porc_packet_size))
 	{
-		if (presentkeys!=0)
+		fprintf (stderr, "Failed to receive the size of the packet in porc_recv\n");
+		return -1;
+	}
+
+	char *porc_packet = malloc(porc_packet_size);
+	*(uint32_t *)porc_packet = porc_packet_size;
+	if(gnutls_record_recv (client_circuit.relay1_gnutls_session, porc_packet+sizeof(uint32_t), porc_packet_size-sizeof(uint32_t))
+		!=porc_packet_size-sizeof(uint32_t))
+	{
+		fprintf (stderr, "Failed to receive the packet in porc_recv()\n");
+		return -1;
+	}
+
+	int i;
+	char *message_in_packet = porc_packet+sizeof(PORC_PACKET_HEADER);
+	int message_in_packet_length = porc_packet_length-sizeof(PORC_PACKET_HEADER);
+	for (i=0 ; i<client_circuit.nbr_relays; i++)
+	{
+		if (gcry_cipher_decrypt(client_circuit.gcry_cipher_hd[i], message_in_packet,
+			message_in_packet_length, NULL, 0))
 		{
-			int size;
-			if (gnutls_record_recv (session, (char*) &size , sizeof(int))!=sizeof(int))
-			{
-				fprintf (stderr, "Incorrect expected size to be received\n");
-				return -1;
-			}
-			if (expectedsize!=size)
-			{
-				fprintf (stderr, "Incorrect size, not that expected\n");
-				return -1;
-			}
-			char * in = malloc(size);
-			if(gnutls_record_recv (session, in, size)!=size)
-			{
-				fprintf (stderr, "Incorrect size, not that expected\n");
-				return -1;
-			}
-			memcpy(msg,in+2*sizeof(int),size-2*sizeof(int));
-			size = size - 2*sizeof(int);
-			int i;			
-			for (i=0 ; i<presentkeys ; i++)
-			{
-				aesImportKey(keytable[i],SYM_KEY_LEN);
-				size = aesDecrypt(msg,size);
-			}
-			return size;
-		}
-		else
-		{
-			int i;
-			gnutls_record_recv (session, msg, expectedsize);
-			for (i=0 ; i<presentkeys ; i++)
-			{
-				aesImportKey(keytable[i],SYM_KEY_LEN);
-				expectedsize = aesDecrypt(msg,expectedsize);
-			}
-			return expectedsize;
+			fprintf (stderr, "gcry_cipher_decrypt failed\n");
+			return -1;
 		}
 	}
-	
-int porc_record_send (gnutls_session_t session, char * msg, size_t size)
-	{
-		if (presentkeys!=0)
-		{
-			int i;
-			for (i=presentkeys ; i>0 ; i--)
-			{
-				aesImportKey(keytable[i],SYM_KEY_LEN);
-				size = aesEncrypt(msg,size);
-			}
-			char * out = malloc(size+2*sizeof(int));
-			((int *)out)[0] = PORC_DIRECTION_UP;
-			((int *)out)[1] = 0;
-			memcpy(out+2*sizeof(int),msg,size);
-			size = size+2;
-			if (gnutls_record_send (session, (char*) size , sizeof(size))!=sizeof(size))
-			{
-				fprintf (stderr, "Incorrect expected size to be sent\n");
-				return -1;
-			}
-			return (gnutls_record_send (session, msg, size));
-		}
-		else
-		{
-			int i;
-			for (i=presentkeys ; i>0 ; i--)
-			{
-				aesImportKey(keytable[i],SYM_KEY_LEN);
-				size = aesEncrypt(msg,size);
-			}
-			return (gnutls_record_send (session, msg, size));
+
+	*message_length = *(size_t*)message_in_packet;
+	if (message_length > message_in_packet_length) {
+		fprintf (stderr, "Message length too high\n");
+		return -1;
+	}
+
+	message = malloc (message_length);
+	memcpy (message, message_in_packet+sizeof(int), *message_length);
+
+	free (porc_packet);
+	return 0;
+}
+
+
+int porc_send (PORC_COMMAND command, char *message, size_t message_length)
+{
+	int crypted_message_length = ((sizeof(int)+message_length+CRYPTO_CIPHER_BLOCK_LENGTH-1)/
+		CRYPTO_CIPHER_BLOCK_LENGTH)*CRYPTO_CIPHER_BLOCK_LENGTH;
+	int porc_packet_length = sizeof(PORC_PACKET_HEADER) + crypted_message_length;
+	char *porc_packet = malloc(porc_packet_length);
+
+	PORC_PACKET_HEADER *porc_packet_header = (PORC_PACKET_HEADER *)porc_packet;
+	char *message_in_packet = porc_packet + sizeof(PORC_PACKET_HEADER);
+
+	porc_packet_header->length = porc_packet_length;
+	porc_packet_header->command = command;
+	porc_packet_header->direction = PORC_DIRECTION_DOWN;
+	porc_packet_header->porc_session_id = 0;
+	*(int *)message_in_packet = message_length;
+	memcpy(message_in_packet+sizeof(int), message, message_length);
+	memset (message_in_packet+sizeof(int)+message_length, 'a', crypted_message_length-(sizeof(int)+message_length));
+
+	int i;
+	for (i=client_circuit.nbr_relays-1; i>=0; i--) {
+		if (gcry_cipher_encrypt(client_circuit.gcry_cipher_hd[i], message_in_packet, crypted_message_length, NULL, 0)) {
+			fprintf (stderr, "gcry_cipher_encrypt failed\n");
+			return -1;
 		}
 	}
+
+	if (gnutls_record_send (client_circuit.relay1_gnutls_session, porc_packet, porc_packet_length) != porc_packet_length)
+	{
+		fprintf (stderr, "Incorrect expected size to be sent in porc_send()\n");
+		return -1;
+	}
+
+	free (porc_packet);
+	return 0;
+}
 
 
 
@@ -400,7 +404,7 @@ int client_circuit_init (int circuit_length) {
 		}
 		free (porc_content_open_porc);
 
-		// Wait for a acknowlegdment
+		// Wait for an acknowlegdment
 		PORC_RESPONSE_OPEN_PORC_CONTENT *porc_response_open_porc_content;
 		if (porc_recv (&response, (char *)&porc_response_open_porc_content, &response_length) != 0) {
 		{

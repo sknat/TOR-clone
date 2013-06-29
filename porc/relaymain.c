@@ -12,8 +12,8 @@ static gnutls_priority_t priority_cache;
 pthread_t accepting_thread;
 pthread_t selecting_thread;
 
-gcry_sexp_t publicKey; 
-gcry_sexp_t privateKey;
+gcry_sexp_t public_key; 
+gcry_sexp_t private_key;
 
 
 CHAINED_LIST tls_session_list;
@@ -52,85 +52,152 @@ int handle_connection(int client_socket_descriptor) {
 	}
 	printf ("Tls handshake was completed\n");
 	
+	// Record TLS session
+	ITEM_TLS_SESSION *tls_session;
+	int tls_session_id = ChainedListNew (&tls_session_list, (void**) &tls_session, sizeof(ITEM_TLS_SESSION));
+	tls_session->socket_descriptor = client_socket_descriptor;
+	tls_session->gnutls_session = gnutls_session;
+
 	// Start a PORC session
 	// wait for asking public key
-	PUB_KEY_REQUEST pub_key_request;
-	if (gnutls_record_recv (gnutls_session, (char *)&pub_key_request, 
-		sizeof (pub_key_request)) != sizeof (pub_key_request))
+	PORC_HANDSHAKE_REQUEST porc_hanshake_request;
+	if (gnutls_record_recv (gnutls_session, (char *)&porc_hanshake_request, 
+		sizeof (porc_hanshake_request)) != sizeof (porc_hanshake_request))
 	{
 		fprintf (stderr, "Error in public key request (router)\n");
 		return -1;
 	}
 	printf ("Public key requested\n");
-	if (pub_key_request.command != PUB_KEY_ASK)
+	if (pub_key_request.command != PORC_HANDSHAKE_REQUEST_CODE)
 	{
 		fprintf (stderr, "Error : invalid public key request\n");
 		return -1;
 	}
-	printf ("Valid request\n");
-	//Send public Key
-	PUB_KEY_RESPONSE pub_key_response;
-	char * export_pub_key = malloc(PUBLIC_KEY_LEN);
-	if (rsaExportKey(&publicKey, export_pub_key)!=0)
+	printf ("Valid public key request\n");
+
+	// Send public Key
+
+	int public_key_length = gcry_sexp_sprint (*public_key, OUT_MODE, NULL, 0));
+	int message_length = sizeof(PORC_HANDSHAKE_KEY_HEADER)+public_key_length;
+	char *message = malloc (message_length);
+	PORC_HANDSHAKE_KEY_HEADER *porc_handshake_key_header = (PORC_HANDSHAKE_KEY_HEADER *)message;
+	if (gcry_sexp_sprint(public_key, OUT_MODE, message+sizeof(PORC_HANDSHAKE_KEY_HEADER), public_key_length) != 0) 
 	{
-		fprintf (stderr, "Error exporting public key (router)\n");
+		printf("Error while exporting key");
+		free (message);
 		return -1;
 	}
-	printf ("Exported public key\n");
-	pub_key_response.status = PUB_KEY_SUCCESS;
-	memcpy(pub_key_response.public_key,export_pub_key,PUBLIC_KEY_LEN);
-	if (gnutls_record_send (gnutls_session, (char *)&pub_key_response, 
-		sizeof (pub_key_response)) != sizeof (pub_key_response))
+
+	porc_handshake_key_header->status = PUB_KEY_SUCCESS;
+	porc_handshake_key_header->key_length = public_key_length;
+	if (gnutls_record_send (gnutls_session, message, message_length) != message_length)
 	{
 		fprintf (stderr, "Error sending public key (router)\n");
 		return -1;
 	}
 	printf ("Sent public key\n");
-	free(export_pub_key);
-	//Wait for the symmetric key
-	CRYPT_SYM_KEY_RESPONSE crypt_sym_key_response;
-	ret = gnutls_record_recv (gnutls_session, (char *)&crypt_sym_key_response, 
-		sizeof (crypt_sym_key_response));
-	if (ret != sizeof (crypt_sym_key_response)) 
+	free(message);
+
+
+	// Wait for the symmetric key
+	PORC_HANDSHAKE_NEW porc_handshake_new;
+	if (gnutls_record_recv (gnutls_session, (char *)&porc_handshake_new, 
+		sizeof (porc_handshake_new)) != sizeof (porc_handshake_new)) 
 	{
-		fprintf (stderr, "Error while awaiting symmetric key (router) size=%i awaited=%i\n",sizeof (crypt_sym_key_response),ret);
+		fprintf (stderr, "Error while awaiting symmetric key\n");
 		return -1;	
 	}
-	printf ("We got sym key\n");
-	if (crypt_sym_key_response.status != CRYPT_SYM_KEY_SUCCESS)
+	if (crypt_sym_key_response.command != PORC_HANDSHAKE_NEW_CODE)
 	{
-		fprintf (stderr, "Error : invalid symmetric key\n");
+		fprintf (stderr, "Error : invalid command\n");
 		return -1;
 	}
-	printf ("Valid container for sym key\n");
-	
-	char sym_key[SYM_KEY_LEN];
-	if (rsaDecrypt(crypt_sym_key_response.crypt_sym_key,CRYPT_SYM_KEY_LEN, sym_key, privateKey)<0)
+	if (crypt_sym_key_response.key_length > 1024) {
 	{
-		fprintf (stderr, "Error decrypting symmetric key\n");
+		fprintf (stderr, "Error : crypted key too long\n");
 		return -1;
 	}
+	char *crypted_key = malloc (crypt_sym_key_response.key_length);
+	if (gnutls_record_recv (gnutls_session, (char *)&crypted_key, 
+		crypt_sym_key_response.key_length) != crypt_sym_key_response.key_length) 
+	{
+		fprintf (stderr, "Error while awaiting symmetric key (2)\n");
+		return -1;	
+	}
+	printf ("Received sym key\n");
+
+	// Decrypt the sym key
+
+	gcry_sexp_t sexp_plain;
+	gcry_sexp_t sexp_crypted;
+
+	if (gcry_sexp_new(&sexp_crypt, crypted_key, crypt_sym_key_response.key_length, 1) != 0) 
+	{
+		printf("Error while reading the encrypted data");	
+		return -1;
+	}
+	if (gcry_pk_decrypt (&sexp_plain, sexp_crypt, private_key) != 0) 
+	{
+		printf("Error during the decryption");
+		return -1;
+	}
+	int key_plain_length = gcry_sexp_sprint (sexp_plain, OUT_MODE, NULL, 0);
+	char *key_plain = malloc (key_plain_length);
+	if (gcry_sexp_sprint (sexp_plain, OUT_MODE, key_plain, key_plain_length) == 0)
+	{
+		printf("Error while printing decryption result");
+		return -1;
+	}
+
+	free (crypted_key);
+	gcry_sexp_release(crypt_sexp);
+	gcry_sexp_release(plain_sexp);
+
 	printf ("sym key decrypted\n");
 
-	// Record TLS session
-	ITEM_TLS_SESSION * tls_session;
-	int tls_session_id = ChainedListNew (&tls_session_list, (void**) &tls_session, sizeof(ITEM_TLS_SESSION));
-	tls_session->socket_descriptor = client_socket_descriptor;
-	tls_session->gnutls_session = gnutls_session;
+	// Create a gcrypt context
+	gcry_cipher_hd_t gcry_cipher_hd;
+	if (gcry_cipher_open (&gcry_cipher_hd_t, GCRY_CIPHER, GCRY_CIPHER_MODE_CBC, 0)) {
+		fprintf (stderr, "gcry_cipher_open failed\n");
+		return -1;
+	}
+	if (gcry_cipher_setkey (gcry_cipher_hd, crypted_key+1, CRYPTO_CIPHER_KEY_LENGTH) != 0) {
+		fprintf (stderr, "gcry_cipher_setkey failed\n");
+		return -1;
+	}
+	if (gcry_cipher_setiv (gcry_cipher_hd, crypted_key+1+CRYPTO_CIPHER_KEY_LENGTH, CRYPTO_CIPHER_BLOCK_LENGTH) != 0) {
+		fprintf (stderr, "gcry_cipher_setiv failed\n");
+		return -1;
+	}
 
-		
+	free (key_plain);
+
+	PORC_HANDSHAKE_ACK porc_handshake_ack;
+	porc_handshake_ack.status = PORC_STATUS_SUCCESS;
+	if (gnutls_record_send (gnutls_session, porc_handshake_ack, sizeof(porc_handshake_ack)) != sizeof(porc_handshake_ack))
+	{
+		fprintf (stderr, "Error sending acknowledgment (router)\n");
+		return -1;
+	}	
+
 	// Record the PORC session
 	ITEM_PORC_SESSION *porc_session;
 	int porc_session_id;
 	porc_session_id = ChainedListNew (&porc_session_list, (void *)&porc_session, sizeof(ITEM_PORC_SESSION));
-	porc_session->id_prev = pub_key_request.porc_session; 
+	porc_session->id_prev = porc_handshake_new.porc_session; 
 	porc_session->client_tls_session = tls_session_id;
+	porc_session->gcry_cipher_hd = gcry_cipher_hd;
 	porc_session->final = 1;
 	porc_session->server_tls_session = 0;
-	memcpy(porc_session->sym_key, sym_key, SYM_KEY_LEN);
+
+	// PORC session is ready
+	ChainedListComplete (&porc_session_list, porc_session_id);
+
+	// TLS session is ready
+	ChainedListComplete (&tls_session_list, tls_session_id);
 
 	printf ("Porc session %d recorded\n", porc_session_id);
-	sleep(2);
+
 	// Signaling a new available socket to the selecting thread
 	if (pthread_kill (selecting_thread, SIGUSR1) != 0) {
 		fprintf (stderr, "Signal sending failed\n");
@@ -470,17 +537,44 @@ int main (int argc, char **argv)
 	int port;
 	int ret;
 
-	if (rsaInit()!=0) 
+	// gcrypt initialisation
+	if (!gcry_check_version (GCRYPT_VERSION)) {
+		fprintf (stderr, "libgcrypt version mismatch\n");
+		return -1;
+	}
+	gcry_control (GCRYCTL_ENABLE_QUICK_RANDOM, 0);
+	gcry_control (GCRYCTL_DISABLE_SECMEM, 0);
+	gcry_control (GCRYCTL_INITIALIZATION_FINISHED, 0);	
+
+	// assymmetric keys creation
+
+	gcry_sexp_t key_specification;
+	gcry_sexp_t key;
+	
+	if(gcry_sexp_new(&key_specification, "(genkey (rsa (nbits 4:2048)))", 0, 1) != 0)
 	{
-		fprintf(stderr, "Error initializing RSA\n");
+		fprintf (stderr, "Error creating S-expression for RSA keys\n");
 		return -1;
 	}
 
-	if (rsaGenKey(&publicKey, &privateKey)!=0) 
+	if (gcry_pk_genkey (&key, key_specification) != 0)
 	{
-		fprintf(stderr, "Error initializing RSA Keys\n");
+		fprintf (stderr, "Error while generating RSA key.\n");
 		return -1;
 	}
+	gcry_sexp_release (key_specification);
+	
+	if (!(*public_key = gcry_sexp_find_token (key, "public-key", 0))) 
+	{
+		fprintf (stderr, "Error seeking for public part in key.\n");
+		return -1;
+	}
+	if (!(*private_key = gcry_sexp_find_token( key, "private-key", 0 ))) 
+	{
+		fprintf (stderr, "Error seeking for private part in key.\n");
+		return -1;
+	}
+	gcry_sexp_release(key);
 	
 	if (argc != 2) {
 		fprintf (stderr, "Incorrect number of argument : you must define a port to listen to\n");

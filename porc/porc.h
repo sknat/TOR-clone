@@ -55,8 +55,9 @@ typedef struct {
 #define PORC_DIRECTION_DOWN 3
 #define PORC_DIRECTION_UP 2
 
-typedef struct {
-	uint32_t length;
+typedef struct
+	uint32_t length;			// length of the whole packet
+	PORC_COMMAND command;
 	uint8_t direction;
 	uint32_t porc_session_id;
 } __attribute__((packed))	PORC_PACKET_HEADER;

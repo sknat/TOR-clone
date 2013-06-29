@@ -55,12 +55,26 @@ int ChainedListFind (CHAINED_LIST* p, int id, void **item)
 	return -1;
 }
 
+int ChainedListComplete (CHAINED_LIST* p, int id) {
+	CHAINED_LIST_LINK* c = p->first;
+	while(c)
+	{
+		if (c->id==id) 
+		{
+			c->complete=1;
+			return 0;
+		}
+		c = c->nxt;
+	}
+	return -1;
+}
 
 int ChainedListNew (CHAINED_LIST *p, void **item, int item_size)
 {
 	CHAINED_LIST_LINK* el = malloc(sizeof(CHAINED_LIST_LINK));
 
 	el->id = p->index;
+	el->complete = 0;
 	printf ("id = %d\n", el->id);
 	el->item = malloc(item_size);
 	printf ("item = %X\n", (unsigned int)(el->item));
@@ -75,6 +89,17 @@ int ChainedListNew (CHAINED_LIST *p, void **item, int item_size)
 	
 	return el->id;
 }
+
+int ChainedListNext (CHAINED_LIST_LINK **p, void **item) {
+	if ((*p)->nxt != NULL) {
+		*p = (*p)->nxt;
+		*item = &((*p)->item);
+		return 0;
+	}
+
+	return -1;
+}
+
 
 void ChainedListClear (CHAINED_LIST *p)
 {
