@@ -19,17 +19,21 @@ relay.exe:	relaymain.o mytls.o mytcp.o chainedlist.o signaling.o
 	@echo "--------------------------------------------------------------------------------"
 	@echo [link]
 	$(CC) -o $@ relaymain.o mytls.o mytcp.o chainedlist.o signaling.o $(LIBS) -lpthread
-
+	cp relay.exe ./relay01/relay.exe
+	cp relay.exe ./relay02/relay.exe
+	
 directory.exe:	directory.o mytls.o mytcp.o
 	@echo "--------------------------------------------------------------------------------"
 	@echo [link]
 	$(CC) -o $@ directory.o mytls.o mytcp.o $(LIBS) -lpthread
+	cp directory.exe ./directory/directory.exe
 
 client.exe:	clientmain.o select.o mytls.o socks.o mytcp.o chainedlist.o porc.o signaling.o
 	@echo "--------------------------------------------------------------------------------"
 	@echo [link]
-	$(CC) -o $@ clientmain.o select.o mytls.o socks.o mytcp.o chainedlist.o $(LIBS) porc.o signaling.o -lpthread
-
+	$(CC) -o $@ clientmain.o select.o mytls.o socks.o mytcp.o chainedlist.o porc.o signaling.o  $(LIBS) -lpthread
+	cp client.exe ./client/client.exe
+	
 sclient.exe:	sclient.o
 	@echo "--------------------------------------------------------------------------------"
 	@echo [link]
@@ -41,6 +45,4 @@ sclient.exe:	sclient.o
 	@$(CC) -c $(CFLAGS) $< -o $@
 
 clean:
-	rm -f $(OBJ) *~ $(BINS)
-	rm -f ./*.stackdump
-	rm -f ./*/*.stackdump
+	rm -f $(OBJ) *~ $(BINS) ./*.stackdump ./*/*.stackdump ./*/*.exe
