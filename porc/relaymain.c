@@ -166,9 +166,15 @@ int handle_connection(int client_socket_descriptor) {
 
 	// Convert hex representation to natural representation
 	int i;
-	int j = 0;
-	if ((key_plain[1] == '0') && (key_plain[2] == '0')) {
+	int j;
+	for (i=1; (i<key_plain_length) && (key_plain[i]!='#'); i++) {}
+	if (i==2*(CRYPTO_CIPHER_KEY_LENGTH+CRYPTO_CIPHER_BLOCK_LENGTH)+1) {
+		j = 0;
+	} else if (i==2*(CRYPTO_CIPHER_KEY_LENGTH+CRYPTO_CIPHER_BLOCK_LENGTH)+3) {
 		j = 2;
+	} else {
+		fprintf (stderr, "Wrong sym key representation\n");
+		return -1;
 	}
 	for (i=j+1; i<j+1+2*(CRYPTO_CIPHER_KEY_LENGTH+CRYPTO_CIPHER_BLOCK_LENGTH); i++) {
 		if ((key_plain[i] >= 'A') && (key_plain[i] <= 'F')) {
@@ -176,7 +182,7 @@ int handle_connection(int client_socket_descriptor) {
 		} else if ((key_plain[i] >= '0') && (key_plain[i] <= '9')) {
 			key_plain[i] = key_plain[i] - '0';
 		} else {
-			printf("Error processing sym key\n");
+			fprintf (stderr, "Error processing sym key\n");
 			return -1;
 		}
 	}
@@ -315,21 +321,21 @@ int relay_porc_send (int code, int porc_session_id, char *payload, size_t payloa
 	char *payload_in_packet = porc_packet + sizeof(PORC_PACKET_HEADER);
 	PORC_PAYLOAD_HEADER *payload_header = (PORC_PAYLOAD_HEADER *)payload_in_packet;
 
-	porc_packet_header->length = porc_packet_length;
-	porc_packet_header->direction = PORC_DIRECTION_UP;
-	porc_packet_header->porc_session_id = porc_session_id;
-	payload_header->code = code;
-	payload_header->length = sizeof(PORC_PAYLOAD_HEADER)+payload_length;
-	memcpy(payload_in_packet+sizeof(PORC_PAYLOAD_HEADER), payload, payload_length);
-	memset (payload_in_packet+sizeof(PORC_PAYLOAD_HEADER)+payload_length, 'a',
-		crypted_payload_length-(sizeof(PORC_PAYLOAD_HEADER)+payload_length));
-
 	// find the porc session
 	ITEM_PORC_SESSION *porc_session;
 	if (ChainedListFind (&porc_session_list, porc_session_id, (void **)&porc_session) != 0) {
 		fprintf (stderr, "Impossible to find the porc session\n");
 		return -1;
 	}
+
+	porc_packet_header->length = porc_packet_length;
+	porc_packet_header->direction = PORC_DIRECTION_UP;
+	porc_packet_header->porc_session_id = porc_session->id_prev;
+	payload_header->code = code;
+	payload_header->length = sizeof(PORC_PAYLOAD_HEADER)+payload_length;
+	memcpy(payload_in_packet+sizeof(PORC_PAYLOAD_HEADER), payload, payload_length);
+	memset (payload_in_packet+sizeof(PORC_PAYLOAD_HEADER)+payload_length, 'a',
+		crypted_payload_length-(sizeof(PORC_PAYLOAD_HEADER)+payload_length));
 
 	// find the tls session
 	ITEM_TLS_SESSION *tls_session;
@@ -406,6 +412,7 @@ int process_porc_packet(int tls_session_id) {
 	
 	if (porc_packet_header.direction == PORC_DIRECTION_DOWN) {
 		// We must decode
+		printf ("direction is DOWN\n");
 
 		CHAINED_LIST_LINK *c;
 		porc_session_id = -1;
@@ -436,14 +443,20 @@ int process_porc_packet(int tls_session_id) {
 		if (porc_session->final == 0) 
 		{
 			//Rewrite paquet
-			porc_packet_header.porc_session_id = porc_session_id;	
-			if (gnutls_record_send (gnutls_session, (char *)&porc_packet_header, sizeof(porc_packet_header)) 
+			printf ("Rewrite packet\n");
+			porc_packet_header.porc_session_id = porc_session_id;
+
+			// Find TLS session
+			ITEM_TLS_SESSION *next_tls_session;
+			ChainedListFind (&tls_session_list, porc_session->server_tls_session, (void **)&next_tls_session);
+
+			if (gnutls_record_send (next_tls_session->gnutls_session, (char *)&porc_packet_header, sizeof(porc_packet_header)) 
 				!= sizeof(porc_packet_header))
 			{
 				fprintf (stderr, "Error forwarding header to next relay (router)\n");
 				return -1;
 			}
-			if (gnutls_record_send (gnutls_session, (char *)&payload, payload_length) 
+			if (gnutls_record_send (next_tls_session->gnutls_session, (char *)&payload, payload_length) 
 				!= payload_length)
 			{
 				fprintf (stderr, "Error forwarding payload to next relay (router)\n");
@@ -557,6 +570,9 @@ int process_porc_packet(int tls_session_id) {
 					tls_session->socket_descriptor = socket_descriptor;
 					tls_session->gnutls_session = gnutls_session;
 					ChainedListComplete (&tls_session_list, tls_session_id);
+
+					// Record the tls session in the porc session
+					porc_session->server_tls_session = tls_session_id;
 				}
 
 				// PROC handshake part I
@@ -617,68 +633,79 @@ int process_porc_packet(int tls_session_id) {
 				free (new_payload);						
 				printf ("Send public key\n");
 			} else if (porc_payload_header->code == PORC_COMMAND_OPEN_PORC) {
-				PORC_CONTENT_OPEN_PORC_HEADER *porc_content_open_porc_header = (PORC_CONTENT_OPEN_PORC_HEADER *)payload_content;
+				PORC_COMMAND_OPEN_PORC_HEADER *porc_command_open_porc_header = (PORC_COMMAND_OPEN_PORC_HEADER *)payload_content;
 
 				// Find the TLS connection
-				int tls_session_id = -1;
+				int tls_session_id = porc_session->server_tls_session;
 				ITEM_TLS_SESSION *tls_session;
-				CHAINED_LIST_LINK *c;
-				for (c=tls_session_list.first; c!=NULL; c=c->nxt) {
-					struct sockaddr_in peeraddr;
-
-					socklen_t peeraddrlen = sizeof(peeraddr);
-					getpeername (((ITEM_TLS_SESSION *)(c->item))->socket_descriptor,
-						(struct sockaddr *)&peeraddr, &peeraddrlen);
-					if ((ntohl(peeraddr.sin_addr.s_addr) == porc_command_open_porc_header->ip)
-						&& (ntohs(peeraddr.sin_port) == porc_command_open_porc_header->port))
-					{
-						printf ("Found the already open tls session.");
-						tls_session_id = c->id;
-						tls_session = (ITEM_TLS_SESSION *)(c->item);
-						break;
-					}
-				}
-				if (tls_session_id == -1) {
-					fprintf (stderr, "No tls connection to next relay\n");
+				ChainedListFind (&tls_session_list, tls_session_id, (void **)&tls_session);
+				struct sockaddr_in peeraddr;
+				socklen_t peeraddrlen = sizeof(peeraddr);
+				getpeername (tls_session->socket_descriptor, (struct sockaddr *)&peeraddr, &peeraddrlen);
+				if ((ntohl(peeraddr.sin_addr.s_addr) != porc_command_open_porc_header->ip)
+					|| (ntohs(peeraddr.sin_port) != porc_command_open_porc_header->port))
+				{
+					printf ("Wrong ip/port in PORC_COMMAND_OPEN_PORC : %08x:%d vs %08x:%d.\n",
+						ntohl(peeraddr.sin_addr.s_addr), ntohs(peeraddr.sin_port), porc_command_open_porc_header->ip,
+						porc_command_open_porc_header->port);
 					return -1;
 				}
 
 				// Send the crypted key
-				int key_length = porc_payload_header.length - sizeof(PORC_PAYLOAD_HEADER);
+
+				int key_length = porc_payload_header->length - sizeof(PORC_PAYLOAD_HEADER);
 				char *key = payload_content + sizeof(PORC_PAYLOAD_HEADER);
 				int new_payload_length = sizeof(PORC_HANDSHAKE_NEW) + key_length;
 				char *new_payload = malloc (new_payload_length);
-				PORC_HANDSHAKE_NEW porc_handshake_new = 
-				
+				char *key_in_new_payload = new_payload + sizeof(PORC_HANDSHAKE_NEW);
 
-				// Find the tls connection created by a PORC_COMMAND_ASK_KEY command, send the crypted key,
-//record the tls & socks connection and send back the ack
-//...
-/*
-				gnutls_session_t target_gnutls_session;
-				printf ("Received a open porc command\n");
-				uint32_t open_porc_ip = ntohl(*((uint32_t* )(message+4)));
-				uint16_t open_porc_port = ntohl(*((uint16_t* )(message+8)));
-				int target_socket_descriptor;
-				if (mytls_client_session_init (htonl(open_porc_ip), htons(open_porc_port), 
-					&target_gnutls_session, &target_socket_descriptor) < 0) 
+
+				PORC_HANDSHAKE_NEW *porc_handshake_new = (PORC_HANDSHAKE_NEW *)new_payload;
+				porc_handshake_new->command = PORC_HANDSHAKE_NEW_CODE;
+				porc_handshake_new->porc_session_id = porc_session_id;
+				porc_handshake_new->key_length = key_length;
+
+				memcpy (key_in_new_payload, key, key_length);
+
+				if (gnutls_record_send (tls_session->gnutls_session, new_payload, 
+					new_payload_length) != new_payload_length)
 				{
-					fprintf (stderr, "Error Connecting tls for router\n");
+					fprintf (stderr, "Error in sending crypted key to next relay (router)\n");
 					return -1;
 				}
-				ITEM_TLS_SESSION * target_tls_session;
-				int target_tls_session_id = ChainedListNew(&tls_session_list, (void **)&target_tls_session,
-					sizeof(ITEM_TLS_SESSION));
-				if (target_tls_session_id<0)
+
+				free (new_payload);
+				printf ("Crypted key sent\n");
+				
+				// Receive the acknowledgment
+				PORC_HANDSHAKE_ACK porc_handshake_ack;
+				if (gnutls_record_send (tls_session->gnutls_session, (char *)&porc_handshake_ack, 
+					sizeof(porc_handshake_ack)) != sizeof(porc_handshake_ack))
 				{
-					fprintf (stderr, "ChainList Errror\n");
+					fprintf (stderr, "Error in receiving ack from next relay (router)\n");
 					return -1;
 				}
-				target_tls_session->socket_descriptor = target_socket_descriptor;
-				target_tls_session->gnutls_session = target_gnutls_session;
-						
-				porc_session->server_tls_session = tls_session_id;
-				porc_session->final = 0;*/
+				if (porc_handshake_ack.status != PORC_STATUS_SUCCESS)
+				{
+					fprintf (stderr, "Error in receiving ack from next relay (router) : wrong status\n");
+					return -1;
+				}
+
+				// Sending the ack
+				PORC_RESPONSE_OPEN_PORC_CONTENT porc_response_open_porc_content;
+				porc_response_open_porc_content.status = PORC_STATUS_SUCCESS;
+				if (relay_porc_send (PORC_RESPONSE_OPEN_PORC, porc_session->id_prev, (char *)&porc_response_open_porc_content,
+					sizeof(porc_response_open_porc_content)) != 0)
+				{
+					fprintf (stderr, "Error sending ack (router)\n");
+					return -1;
+				}
+
+				printf ("Ack sent\n");
+
+				// The relay is no longer final
+				porc_session->final = 0;
+				ChainedListComplete (&porc_session_list, porc_session->server_tls_session);
 			} else if (porc_payload_header->code == PORC_COMMAND_CLOSE_SOCKS) {
 				//
 
@@ -694,6 +721,7 @@ int process_porc_packet(int tls_session_id) {
 		return 0;
 	} else if (porc_packet_header.direction == PORC_DIRECTION_UP) {
 		// We must encode
+		printf ("direction is UP\n");
 
 		CHAINED_LIST_LINK *c;
 		porc_session_id = -1;

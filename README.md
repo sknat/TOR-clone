@@ -6,6 +6,7 @@ SECURITY:
 * a thread should be spawn before every blocking operation
 * control inputs (particularly lengths to allocate)
 * PORC handshake insecurity
+* several porc sessions code
 
 TODO :
 * ajouter la license GPL2

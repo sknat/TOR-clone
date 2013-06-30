@@ -90,6 +90,11 @@ int client_porc_send (PORC_COMMAND command, char *payload, size_t payload_length
 	memcpy(payload_in_packet+sizeof(PORC_PAYLOAD_HEADER), payload, payload_length);
 	memset (payload_in_packet+sizeof(PORC_PAYLOAD_HEADER)+payload_length, 'a',
 		crypted_payload_length-(sizeof(PORC_PAYLOAD_HEADER)+payload_length));
+	printf ("First payload bytes : %08x,%08x,%08x,%08x\n", *(int *)(payload+0), *(int *)(payload+4),
+		*(int *)(payload+8), *(int *)(payload+12));
+	printf ("length, code : %08x, %04x\n", payload_header->length, payload_header->code);
+	printf ("First payload bytes : %08x,%08x,%08x,%08x\n", *(int *)(payload_in_packet+0), *(int *)(payload_in_packet+4),
+		*(int *)(payload_in_packet+8), *(int *)(payload_in_packet+12));
 
 	int i;
 	for (i=client_circuit.length-1; i>=0; i--) {
@@ -383,6 +388,7 @@ int client_circuit_init (int circuit_length) {
 		r = 1;//r % nbr_relays;		
 
 		// Ask for public key of next node
+		printf ("Ask for public key\n");
 		PORC_COMMAND_ASK_KEY_CONTENT porc_command_ask_key_content;
 		porc_command_ask_key_content.ip = htonl(list_relays[r].ip);
 		porc_command_ask_key_content.port = htons(list_relays[r].port);
@@ -392,6 +398,7 @@ int client_circuit_init (int circuit_length) {
 		}
 
 		// Wait for Public key
+		printf ("Wait for public key\n");
 		PORC_RESPONSE_ASK_KEY_CONTENT *porc_response_ask_key_content;
 		if (client_porc_recv (&response, (char **)&porc_response_ask_key_content, &response_length) != 0)
 		{
@@ -430,20 +437,25 @@ int client_circuit_init (int circuit_length) {
 		free(porc_response_ask_key_content);
 
 		// Send the crypted symmetric key
-		char *porc_content_open_porc = malloc(sizeof(PORC_CONTENT_OPEN_PORC_HEADER)+key_crypted_length);
-		PORC_CONTENT_OPEN_PORC_HEADER *porc_content_open_porc_header = (PORC_CONTENT_OPEN_PORC_HEADER *)porc_content_open_porc;
-		porc_content_open_porc_header->ip = porc_command_ask_key_content.ip;
-		porc_content_open_porc_header->port = porc_command_ask_key_content.port;
-		memcpy (porc_content_open_porc+sizeof(PORC_CONTENT_OPEN_PORC_HEADER), key_crypted, key_crypted_length);
+		printf ("Send the sym key\n");
+		char *porc_command_open_porc = malloc(sizeof(PORC_COMMAND_OPEN_PORC_HEADER)+key_crypted_length);
+		PORC_COMMAND_OPEN_PORC_HEADER *porc_command_open_porc_header = (PORC_COMMAND_OPEN_PORC_HEADER *)porc_command_open_porc;
+		porc_command_open_porc_header->ip = porc_command_ask_key_content.ip;
+		porc_command_open_porc_header->port = porc_command_ask_key_content.port;
+		memcpy (porc_command_open_porc+sizeof(PORC_COMMAND_OPEN_PORC_HEADER), key_crypted, key_crypted_length);
 		free (key_crypted);
-		if (client_porc_send (PORC_COMMAND_OPEN_PORC, (char *)&porc_content_open_porc,
-			sizeof(PORC_CONTENT_OPEN_PORC_HEADER)+key_crypted_length) != 0)
+		printf ("ip, port : %08x, %04x\n", porc_command_open_porc_header->ip, porc_command_open_porc_header->port);
+		printf ("First payload bytes : %08x,%08x,%08x,%08x\n", *(int *)(porc_command_open_porc+0), *(int *)(porc_command_open_porc+4),
+			*(int *)(porc_command_open_porc+8), *(int *)(porc_command_open_porc+12));
+		if (client_porc_send (PORC_COMMAND_OPEN_PORC, (char *)porc_command_open_porc,
+			sizeof(PORC_COMMAND_OPEN_PORC_HEADER)+key_crypted_length) != 0)
 		{
 			return -1;	
 		}
-		free (porc_content_open_porc);
+		free (porc_command_open_porc);
 
 		// Wait for an acknowlegdment
+		printf ("Wait for ack\n");
 		PORC_RESPONSE_OPEN_PORC_CONTENT *porc_response_open_porc_content;
 		if (client_porc_recv (&response, (char **)&porc_response_open_porc_content, &response_length) != 0)
 		{
@@ -467,7 +479,7 @@ int client_circuit_init (int circuit_length) {
 		}
 
 		client_circuit.length++;
-		printf ("--------------New relay---------\n");
+		printf ("--------------New relay %i---------\n", client_circuit.length);
 		//Tunnel is now open to router[router_index]
 	}
 

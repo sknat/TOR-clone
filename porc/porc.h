@@ -120,7 +120,7 @@ typedef struct {
 	uint32_t ip;
 	uint16_t port;
 	// crypted key + init vector follow
-} __attribute__((packed))	PORC_CONTENT_OPEN_PORC_HEADER;
+} __attribute__((packed))	PORC_COMMAND_OPEN_PORC_HEADER;
 
 #define PORC_RESPONSE_OPEN_PORC		202		// Send sym key crypted by public key to open a new PORC connection
 typedef struct {
