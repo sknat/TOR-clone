@@ -91,7 +91,7 @@ typedef struct {
 typedef struct {
 	uint32_t socks_session_id;
 	// content following
-} __attribute__((packed))	PORC_RESPONSE_TRANSMIT;
+} __attribute__((packed))	PORC_CONTENT_RETURN;
 
 
 #define PORC_COMMAND_OPEN_SOCKS		100
@@ -181,6 +181,12 @@ typedef struct {
 */
 extern int client_circuit_init (int circuit_length);
 extern int client_circuit_free ();
+
+extern int client_porc_send (PORC_COMMAND command, char *payload, size_t payload_length);
+extern int client_porc_recv (PORC_RESPONSE *porc_response, char **payload, size_t *payload_length);
+extern int set_symmetric_key (char **key_crypted, int *key_crypted_length, char *public_key, int public_key_length, 
+int relay_index);
+
 
 #endif
 

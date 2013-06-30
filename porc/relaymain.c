@@ -270,6 +270,7 @@ int accepting (int listen_socket_descriptor) {
 }
 
 
+
 void *start_accepting (void *arg) {
 	return ((void *)accepting((int)arg));
 }
@@ -314,11 +315,6 @@ int set_fds (int *nfds, fd_set *fds) {
 
 //////////////////////////////////////////////////////////////////////////
 // Send a packet into the Porc tunnel adding correct header information
-//
-// Code : PORC_DIRECTION_DOWN or PORC_DIRECTION_UP indicates the direction of the packet
-// porc_session_id : identificator for current session
-// payload : packet data (cyphered) + header
-// payload_length : its length
 //////////////////////////////////////////////////////////////////////////
 int relay_porc_send (int code, int porc_session_id, char *payload, size_t payload_length)
 {
@@ -816,15 +812,16 @@ int send_to_porc(int socks_session_id) {
 		return -1;
 	}
 	//Process it to add it to header information
-	int out_buffer_len = in_buffer_len+sizeof(PORC_RESPONSE_TRANSMIT);
+	int out_buffer_len = in_buffer_len+sizeof(PORC_CONTENT_RETURN);
 	char * out_buffer = malloc(out_buffer_len);
-	PORC_RESPONSE_TRANSMIT * payload_header;
+	PORC_CONTENT_RETURN * payload_header = malloc(sizeof(PORC_CONTENT_RETURN));
 	payload_header->socks_session_id = socks_session_id;
-	memcpy(out_buffer,payload_header,sizeof(PORC_RESPONSE_TRANSMIT));
-	memcpy(out_buffer+sizeof(PORC_RESPONSE_TRANSMIT),in_buffer,in_buffer_len);	
+	
+	memcpy(out_buffer,payload_header,sizeof(PORC_CONTENT_RETURN));
+	memcpy(out_buffer+sizeof(PORC_CONTENT_RETURN),in_buffer,in_buffer_len);	
 	//Push it to the TOR stream
-	if (relay_porc_send (PORC_DIRECTION_DOWN, socks_session->client_porc_session, 
-	out_buffer, out_buffer_len)!=out_buffer_len)
+	if (relay_porc_send (PORC_RESPONSE_TRANSMIT, socks_session->client_porc_session, 
+	out_buffer, out_buffer_len)!=0)
 	{
 		fprintf(stderr,"Error pushing SOCKS stream to TOR (tunnel end) : send_to_porc\n");
 		return -1;
