@@ -87,6 +87,12 @@ typedef struct {
 	// content following
 } __attribute__((packed))	PORC_CONTENT_TRANSMIT;
 
+#define PORC_RESPONSE_TRANSMIT		106
+typedef struct {
+	uint32_t socks_session_id;
+	// content following
+} __attribute__((packed))	PORC_RESPONSE_TRANSMIT;
+
 
 #define PORC_COMMAND_OPEN_SOCKS		100
 typedef struct {

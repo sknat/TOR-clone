@@ -1,9 +1,9 @@
-/***********************************************************************************
-	Relay - PORC relay
-
-	The PORC relay transfers a stream to another relay or to the target.
-
-***********************************************************************************/
+// ################################################################################
+//	Relay - PORC relay
+//
+//	The PORC relay transfers a stream to another relay or to the target.
+//
+// ################################################################################
 
 #include "relaymain.h"
 
@@ -20,15 +20,15 @@ CHAINED_LIST tls_session_list;
 CHAINED_LIST porc_session_list;
 CHAINED_LIST socks_session_list;
 
-/* ################################################################################
+// ################################################################################
+//
+//							ACCEPTING CONNECTIONS
+//
+// ################################################################################
 
-							ACCEPTING CONNECTIONS
-
-################################################################################ */
-
-/***********************************************************************************
-	handle_connection - Sets up a TLS and a PORC session with a client or relay.
-***********************************************************************************/
+////////////////////////////////////////////////////////////////////////////////////////
+//	handle_connection - Sets up a TLS and a PORC session with a client or relay.
+////////////////////////////////////////////////////////////////////////////////////////
 int handle_connection(int client_socket_descriptor) {
 	gnutls_session_t gnutls_session;
 	int ret;
@@ -245,9 +245,11 @@ int handle_connection(int client_socket_descriptor) {
 
 	return 0;
 }
-/***********************************************************************************
-	Accepting : Method to be runned in a thread that accepts new connections
-***********************************************************************************/
+
+
+////////////////////////////////////////////////////////////////////////////////////////
+//	Accepting : Method to be runned in a thread that accepts new connections
+////////////////////////////////////////////////////////////////////////////////////////
 int accepting (int listen_socket_descriptor) {
 	struct sockaddr_in sockaddr_client;
 	int client_socket_descriptor;
@@ -273,11 +275,11 @@ void *start_accepting (void *arg) {
 }
 	
 
-/* ################################################################################
-
-							PROCESSING CONNECTIONS
-
-################################################################################ */
+// ################################################################################
+//
+//							PROCESSING CONNECTIONS
+//
+// ################################################################################
 
 int set_fds (int *nfds, fd_set *fds) {
 	CHAINED_LIST_LINK *c;
@@ -310,6 +312,14 @@ int set_fds (int *nfds, fd_set *fds) {
 }
 
 
+//////////////////////////////////////////////////////////////////////////
+// Send a packet into the Porc tunnel adding correct header information
+//
+// Code : PORC_DIRECTION_DOWN or PORC_DIRECTION_UP indicates the direction of the packet
+// porc_session_id : identificator for current session
+// payload : packet data (cyphered) + header
+// payload_length : its length
+//////////////////////////////////////////////////////////////////////////
 int relay_porc_send (int code, int porc_session_id, char *payload, size_t payload_length)
 {
 	int crypted_payload_length = ((sizeof(PORC_PAYLOAD_HEADER)+payload_length+CRYPTO_CIPHER_BLOCK_LENGTH-1)/
@@ -359,7 +369,9 @@ int relay_porc_send (int code, int porc_session_id, char *payload, size_t payloa
 	return 0;
 }
 
-
+////////////////////////////////////////////////////////////////////////////////////////
+// Processes the packet incoming to porc
+////////////////////////////////////////////////////////////////////////////////////////
 
 int process_porc_packet(int tls_session_id) {
 	ITEM_TLS_SESSION *tls_session;
@@ -782,13 +794,50 @@ int process_porc_packet(int tls_session_id) {
 	return -1;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////
+// Gets packets from the socks session at the end of the tunnel and push them into the
+// tunnel toward the client
+////////////////////////////////////////////////////////////////////////////////////////
 int send_to_porc(int socks_session_id) {
-	// Send a packet from a target to a relay.
-
-
+	// Get the current socks session
+	ITEM_SOCKS_SESSION * socks_session;
+	if (ChainedListFind (&socks_session_list, socks_session_id, (void **) &socks_session)!=0)
+	{
+		fprintf(stderr,"Error finding socks_session in send_to_porc\n");
+		return -1;
+	}
+	int in_buffer_len = PORC_MAX_PACKET_LENGTH/2;
+	char * in_buffer = malloc(in_buffer_len);
+	//Read the socks stream
+	in_buffer_len = recv(socks_session->target_socket_descriptor, in_buffer, in_buffer_len, 0);
+	if (in_buffer_len<=0)
+	{
+		fprintf(stderr,"Error reading socks packet %i : send_to_porc\n",in_buffer_len);
+		return -1;
+	}
+	//Process it to add it to header information
+	int out_buffer_len = in_buffer_len+sizeof(PORC_RESPONSE_TRANSMIT);
+	char * out_buffer = malloc(out_buffer_len);
+	PORC_RESPONSE_TRANSMIT * payload_header;
+	payload_header->socks_session_id = socks_session_id;
+	memcpy(out_buffer,payload_header,sizeof(PORC_RESPONSE_TRANSMIT));
+	memcpy(out_buffer+sizeof(PORC_RESPONSE_TRANSMIT),in_buffer,in_buffer_len);	
+	//Push it to the TOR stream
+	if (relay_porc_send (PORC_DIRECTION_DOWN, socks_session->client_porc_session, 
+	out_buffer, out_buffer_len)!=out_buffer_len)
+	{
+		fprintf(stderr,"Error pushing SOCKS stream to TOR (tunnel end) : send_to_porc\n");
+		return -1;
+	}
+	free(out_buffer);
+	free(in_buffer);
 	return 0;
 }
 
+
+////////////////////////////////////////////////////////////////////////////////////////
+// 		Selecting
+////////////////////////////////////////////////////////////////////////////////////////
 int selecting() {
 	fd_set read_fds;
 	int ret, nbr;
@@ -839,10 +888,9 @@ int selecting() {
 }
 
 
-/*
-	main - Initializes a TLS server and starts a thread for every client.
-*/
-
+////////////////////////////////////////////////////////////////////////////////////////
+// 		Main - Initializes a TLS server and starts a thread for every client.
+////////////////////////////////////////////////////////////////////////////////////////
 int main (int argc, char **argv)
 {
 	int listen_socket_descriptor;

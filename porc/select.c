@@ -1,8 +1,13 @@
 #include "select.h"
 
-
-
-int send_to_relay(char *buffer, int n, int porc_session_id) {
+////////////////////////////////////////////////////////////////////////////////////////
+//		Send a packet to the first known relay of the tunnel
+//		Just give in a text buffer to send, its length and the session_id
+////////////////////////////////////////////////////////////////////////////////////////
+int send_to_relay(char *buffer, int buffer_len, int porc_session_id) {
+	
+	
+	
 	return 0;
 }
 
@@ -10,7 +15,7 @@ int send_to_relay(char *buffer, int n, int porc_session_id) {
 int set_fds (int *nfds, fd_set *fds) {
 	CHAINED_LIST_LINK *c;
 	int max = -2;
-	int n=1;
+	int n = 1;
 
 	FD_ZERO (fds);
 	FD_SET (client_circuit.relay1_socket_descriptor, fds);
