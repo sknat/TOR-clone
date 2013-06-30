@@ -514,7 +514,6 @@ int process_porc_packet(int tls_session_id) {
 
 				printf ("Received an ask key command command\n");
 
-				struct sockaddr_in peeraddr;
 				CHAINED_LIST_LINK *c;
 				PORC_COMMAND_ASK_KEY_CONTENT *porc_command_ask_key_content =
 					(PORC_COMMAND_ASK_KEY_CONTENT *)payload_content;
@@ -523,6 +522,7 @@ int process_porc_packet(int tls_session_id) {
 
 				for (c=tls_session_list.first; c!=NULL; c=c->nxt)
 				{
+					struct sockaddr_in peeraddr;
 					if (c->complete == 1) {
 						socklen_t peeraddrlen = sizeof(peeraddr);
 						getpeername (((ITEM_TLS_SESSION *)(c->item))->socket_descriptor,
@@ -590,10 +590,12 @@ int process_porc_packet(int tls_session_id) {
 					fprintf (stderr, "Error receiving public key (router) : wrong length\n");
 					return -1;
 				}
-				int payload_length = sizeof (PORC_RESPONSE_ASK_KEY_CONTENT) + porc_handshake_key_header.key_length;
-				char *payload = malloc (payload_length);
-				char *public_key = payload + sizeof (PORC_RESPONSE_ASK_KEY_CONTENT);
-				if (gnutls_record_recv (tls_session->gnutls_session, public_key, payload_length) != payload_length)
+				printf ("public key length : %d\n", porc_handshake_key_header.key_length);
+				int new_payload_length = sizeof (PORC_RESPONSE_ASK_KEY_CONTENT) + porc_handshake_key_header.key_length;
+				char *new_payload = malloc (new_payload_length);
+				char *public_key = new_payload + sizeof (PORC_RESPONSE_ASK_KEY_CONTENT);
+				if (gnutls_record_recv (tls_session->gnutls_session, public_key, porc_handshake_key_header.key_length)
+					!= porc_handshake_key_header.key_length)
 				{
 					fprintf (stderr, "Error receiving public key (router) : key transmission\n");
 					return -1;
@@ -601,22 +603,56 @@ int process_porc_packet(int tls_session_id) {
 				printf ("Received public key\n");
 
 				// Send back public key
-				PORC_RESPONSE_ASK_KEY_CONTENT *porc_response_ask_key_content = (PORC_RESPONSE_ASK_KEY_CONTENT *)payload;
+				PORC_RESPONSE_ASK_KEY_CONTENT *porc_response_ask_key_content = (PORC_RESPONSE_ASK_KEY_CONTENT *)new_payload;
 				porc_response_ask_key_content->status = PORC_STATUS_SUCCESS;
 				porc_response_ask_key_content->ip = porc_command_ask_key_content->ip;
 				porc_response_ask_key_content->port = porc_command_ask_key_content->port;
-				if (relay_porc_send (PORC_RESPONSE_ASK_KEY, porc_session->id_prev, payload,
-					payload_length) != 0)
+				if (relay_porc_send (PORC_RESPONSE_ASK_KEY, porc_session->id_prev, new_payload,
+					new_payload_length) != 0)
 				{
 					fprintf (stderr, "Error sending public key (router)\n");
 					return -1;
 				}
 
-				free (public_key);						
+				free (new_payload);						
 				printf ("Send public key\n");
 			} else if (porc_payload_header->code == PORC_COMMAND_OPEN_PORC) {
+				PORC_CONTENT_OPEN_PORC_HEADER *porc_content_open_porc_header = (PORC_CONTENT_OPEN_PORC_HEADER *)payload_content;
+
+				// Find the TLS connection
+				int tls_session_id = -1;
+				ITEM_TLS_SESSION *tls_session;
+				CHAINED_LIST_LINK *c;
+				for (c=tls_session_list.first; c!=NULL; c=c->nxt) {
+					struct sockaddr_in peeraddr;
+
+					socklen_t peeraddrlen = sizeof(peeraddr);
+					getpeername (((ITEM_TLS_SESSION *)(c->item))->socket_descriptor,
+						(struct sockaddr *)&peeraddr, &peeraddrlen);
+					if ((ntohl(peeraddr.sin_addr.s_addr) == porc_command_open_porc_header->ip)
+						&& (ntohs(peeraddr.sin_port) == porc_command_open_porc_header->port))
+					{
+						printf ("Found the already open tls session.");
+						tls_session_id = c->id;
+						tls_session = (ITEM_TLS_SESSION *)(c->item);
+						break;
+					}
+				}
+				if (tls_session_id == -1) {
+					fprintf (stderr, "No tls connection to next relay\n");
+					return -1;
+				}
+
+				// Send the crypted key
+				int key_length = porc_payload_header.length - sizeof(PORC_PAYLOAD_HEADER);
+				char *key = payload_content + sizeof(PORC_PAYLOAD_HEADER);
+				int new_payload_length = sizeof(PORC_HANDSHAKE_NEW) + key_length;
+				char *new_payload = malloc (new_payload_length);
+				PORC_HANDSHAKE_NEW porc_handshake_new = 
+				
+
 				// Find the tls connection created by a PORC_COMMAND_ASK_KEY command, send the crypted key,
-//record the socks connection and send back the ack
+//record the tls & socks connection and send back the ack
 //...
 /*
 				gnutls_session_t target_gnutls_session;
