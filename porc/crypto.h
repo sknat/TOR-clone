@@ -1,13 +1,6 @@
 #ifndef PORC_CRYPTO
 #define PORC_CRYPTO
 
-#include <gcrypt.h>
-
-
-#define CRYPTO_CIPHER		GCRY_CIPHER_AES256
-
-#define CRYPTO_CIPHER_KEY_LENGTH	32
-#define CRYPTO_CIPHER_BLOCK_LENGTH	16
 
 
 int cryptoInit();

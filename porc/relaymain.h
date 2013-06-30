@@ -16,13 +16,13 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
+#include <gcrypt.h>
+
 #include "config.h"
 #include "mytcp.h"
 #include "mytls.h"
 #include "chainedlist.h"
 #include "signaling.h"
-#include "aes.h"
-#include "rsa.h"
 #include "porc.h"
 
 

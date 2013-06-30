@@ -68,7 +68,7 @@ int handle_connection(int client_socket_descriptor) {
 		return -1;
 	}
 	printf ("Public key requested\n");
-	if (pub_key_request.command != PORC_HANDSHAKE_REQUEST_CODE)
+	if (porc_hanshake_request.command != PORC_HANDSHAKE_REQUEST_CODE)
 	{
 		fprintf (stderr, "Error : invalid public key request\n");
 		return -1;
@@ -77,18 +77,18 @@ int handle_connection(int client_socket_descriptor) {
 
 	// Send public Key
 
-	int public_key_length = gcry_sexp_sprint (*public_key, OUT_MODE, NULL, 0));
+	int public_key_length = gcry_sexp_sprint (public_key, GCRYSEXP_FMT_ADVANCED, NULL, 0);
 	int message_length = sizeof(PORC_HANDSHAKE_KEY_HEADER)+public_key_length;
 	char *message = malloc (message_length);
 	PORC_HANDSHAKE_KEY_HEADER *porc_handshake_key_header = (PORC_HANDSHAKE_KEY_HEADER *)message;
-	if (gcry_sexp_sprint(public_key, OUT_MODE, message+sizeof(PORC_HANDSHAKE_KEY_HEADER), public_key_length) != 0) 
+	if (gcry_sexp_sprint(public_key, GCRYSEXP_FMT_ADVANCED, message+sizeof(PORC_HANDSHAKE_KEY_HEADER), public_key_length) != 0) 
 	{
 		printf("Error while exporting key");
 		free (message);
 		return -1;
 	}
 
-	porc_handshake_key_header->status = PUB_KEY_SUCCESS;
+	porc_handshake_key_header->status = PORC_STATUS_SUCCESS;
 	porc_handshake_key_header->key_length = public_key_length;
 	if (gnutls_record_send (gnutls_session, message, message_length) != message_length)
 	{
@@ -107,19 +107,19 @@ int handle_connection(int client_socket_descriptor) {
 		fprintf (stderr, "Error while awaiting symmetric key\n");
 		return -1;	
 	}
-	if (crypt_sym_key_response.command != PORC_HANDSHAKE_NEW_CODE)
+	if (porc_handshake_new.command != PORC_HANDSHAKE_NEW_CODE)
 	{
 		fprintf (stderr, "Error : invalid command\n");
 		return -1;
 	}
-	if (crypt_sym_key_response.key_length > 1024) {
+	if (porc_handshake_new.key_length > 1024) {
 	{
 		fprintf (stderr, "Error : crypted key too long\n");
 		return -1;
 	}
-	char *crypted_key = malloc (crypt_sym_key_response.key_length);
+	char *crypted_key = malloc (porc_handshake_new.key_length);
 	if (gnutls_record_recv (gnutls_session, (char *)&crypted_key, 
-		crypt_sym_key_response.key_length) != crypt_sym_key_response.key_length) 
+		porc_handshake_new.key_length) != porc_handshake_new.key_length) 
 	{
 		fprintf (stderr, "Error while awaiting symmetric key (2)\n");
 		return -1;	
@@ -131,33 +131,33 @@ int handle_connection(int client_socket_descriptor) {
 	gcry_sexp_t sexp_plain;
 	gcry_sexp_t sexp_crypted;
 
-	if (gcry_sexp_new(&sexp_crypt, crypted_key, crypt_sym_key_response.key_length, 1) != 0) 
+	if (gcry_sexp_new(&sexp_crypted, crypted_key, porc_handshake_new.key_length, 1) != 0) 
 	{
 		printf("Error while reading the encrypted data");	
 		return -1;
 	}
-	if (gcry_pk_decrypt (&sexp_plain, sexp_crypt, private_key) != 0) 
+	if (gcry_pk_decrypt (&sexp_plain, sexp_crypted, private_key) != 0) 
 	{
 		printf("Error during the decryption");
 		return -1;
 	}
-	int key_plain_length = gcry_sexp_sprint (sexp_plain, OUT_MODE, NULL, 0);
+	int key_plain_length = gcry_sexp_sprint (sexp_plain, GCRYSEXP_FMT_ADVANCED, NULL, 0);
 	char *key_plain = malloc (key_plain_length);
-	if (gcry_sexp_sprint (sexp_plain, OUT_MODE, key_plain, key_plain_length) == 0)
+	if (gcry_sexp_sprint (sexp_plain, GCRYSEXP_FMT_ADVANCED, key_plain, key_plain_length) == 0)
 	{
 		printf("Error while printing decryption result");
 		return -1;
 	}
 
 	free (crypted_key);
-	gcry_sexp_release(crypt_sexp);
-	gcry_sexp_release(plain_sexp);
+	gcry_sexp_release(sexp_crypted);
+	gcry_sexp_release(sexp_plain);
 
 	printf ("sym key decrypted\n");
 
 	// Create a gcrypt context
 	gcry_cipher_hd_t gcry_cipher_hd;
-	if (gcry_cipher_open (&gcry_cipher_hd_t, GCRY_CIPHER, GCRY_CIPHER_MODE_CBC, 0)) {
+	if (gcry_cipher_open (&gcry_cipher_hd, CRYPTO_CIPHER, GCRY_CIPHER_MODE_CBC, 0)) {
 		fprintf (stderr, "gcry_cipher_open failed\n");
 		return -1;
 	}
@@ -174,7 +174,7 @@ int handle_connection(int client_socket_descriptor) {
 
 	PORC_HANDSHAKE_ACK porc_handshake_ack;
 	porc_handshake_ack.status = PORC_STATUS_SUCCESS;
-	if (gnutls_record_send (gnutls_session, porc_handshake_ack, sizeof(porc_handshake_ack)) != sizeof(porc_handshake_ack))
+	if (gnutls_record_send (gnutls_session, (char *)&porc_handshake_ack, sizeof(porc_handshake_ack)) != sizeof(porc_handshake_ack))
 	{
 		fprintf (stderr, "Error sending acknowledgment (router)\n");
 		return -1;
@@ -184,7 +184,7 @@ int handle_connection(int client_socket_descriptor) {
 	ITEM_PORC_SESSION *porc_session;
 	int porc_session_id;
 	porc_session_id = ChainedListNew (&porc_session_list, (void *)&porc_session, sizeof(ITEM_PORC_SESSION));
-	porc_session->id_prev = porc_handshake_new.porc_session; 
+	porc_session->id_prev = porc_handshake_new.porc_session_id;
 	porc_session->client_tls_session = tls_session_id;
 	porc_session->gcry_cipher_hd = gcry_cipher_hd;
 	porc_session->final = 1;
@@ -270,8 +270,7 @@ int set_fds (int *nfds, fd_set *fds) {
 
 
 int process_porc_packet(int tls_session_id) {
-	
-	ITEM_TLS_SESSION * tls_session;
+	ITEM_TLS_SESSION *tls_session;
 	gnutls_session_t gnutls_session;
 	
 	ChainedListFind (&tls_session_list, tls_session_id, (void**)&tls_session);
@@ -279,39 +278,51 @@ int process_porc_packet(int tls_session_id) {
 
 	printf ("A packet to process for the PORC network...\n");
 
-	// Read the number of bytes
-	int length;
-	if (gnutls_record_recv (gnutls_session, (char *)&length, sizeof(length))
-		!= sizeof (length))
+	// Read the header : length, command, direction, porc_session_id
+	PORC_PACKET_HEADER porc_packet_header;
+	if (gnutls_record_recv (gnutls_session, (char *)&porc_packet_header, sizeof(porc_packet_header))
+		!= sizeof (porc_packet_header))
 	{
-		fprintf (stderr, "Impossible to read the length of the PORC packet\n");
+		fprintf (stderr, "Impossible to read the header of the PORC packet\n");
+		return -1;
+	}
+	if (porc_packet_header.length > PORC_MAX_PACKET_LENGTH) {
+		fprintf (stderr, "Packet too long\n");
+		return -1;
+	}
+	if (porc_packet_header.length <= sizeof(porc_packet_header)) {
+		fprintf (stderr, "Packet too short\n");
 		return -1;
 	}
 
-	printf ("length : %d\n", length);
+	printf ("length of the packet : %d\n", porc_packet_header.length);
 
-	// Read the remainder of the packet
-	char *buffer = malloc (length-sizeof(length));
-	if (gnutls_record_recv (gnutls_session, buffer, length-sizeof(length))
-		!= length-sizeof (length))
-	{
-		fprintf (stderr, "Impossible to read the PORC packet\n");
+	char *payload = NULL;
+	int payload_length = porc_packet_header.length-sizeof(PORC_PACKET_HEADER);
+	if (payload_length % CRYPTO_CIPHER_BLOCK_LENGTH != 0) {
+		fprintf (stderr, "Incorrect payload length\n");
 		return -1;
 	}
 
-	int direction = *(int *)(buffer+0);			// Read the direction
-	int porc_received_id = *(int *)(buffer+4);		// Read the PORC session
+	// Read the payload of the packet
+	char *payload = malloc (payload_length);
+	if (gnutls_record_recv (gnutls_session, payload, payload_length)
+		!= payload_length)
+	{
+		fprintf (stderr, "Impossible to read the PORC packet payload\n");
+		return -1;
+	}
 
 	int porc_session_id;
-	ITEM_PORC_SESSION * porc_session;
+	ITEM_PORC_SESSION *porc_session;
 	
-	if (direction == PORC_DIRECTION_DOWN) {
+	if (porc_packet_header.direction == PORC_DIRECTION_DOWN) {
 		// We must decode
 
 		CHAINED_LIST_LINK *c;
 		for (c=porc_session_list.first; c!=NULL; c=c->nxt) {
 			//If we know it as a previous id (find it in our list)
-			if ((((ITEM_PORC_SESSION*)(c->item))->id_prev) == porc_received_id)
+			if ((c->complete) && ((((ITEM_PORC_SESSION*)(c->item))->id_prev) == porc_received_id))
 			{
 				porc_session_id = c->id;
 				porc_session = (ITEM_PORC_SESSION*)(c->item);
@@ -321,68 +332,94 @@ int process_porc_packet(int tls_session_id) {
 					fprintf (stderr, "Wrong tls session\n");
 					return -1;
 				}
-				if(aesImportKey(porc_session->sym_key, SYM_KEY_LEN)!=0)
-				{
-					fprintf(stderr,"Failed to import SYMKEY for encoding/decoding message (router)");
+				if (gcry_cipher_decrypt (porc_session->gcry_cipher_hd, payload, payload_length, NULL, 0)) {
+					fprintf (stderr, "gcry_cipher_decrypt failed\n");
 					return -1;
 				}
-				size_t newsize = aesDecrypt(buffer+2*sizeof(int),length-sizeof(length)-2*sizeof(int));
 				if (porc_session->final == 0) 
 				{
-					int sent_length = newsize + 2*sizeof(int)+sizeof(length);
 					//Rewrite paquet
-					((int *)buffer)[1] = porc_session_id;	
-					if (gnutls_record_send (gnutls_session, (char *)&sent_length, sizeof(sent_length)) 
+					porc_packet_header.porc_session_id = porc_session_id;	
+					if (gnutls_record_send (gnutls_session, (char *)&porc_packet_header, sizeof(porc_packet_header)) 
 						!= sizeof(sent_length))
 					{
-						fprintf (stderr, "Error forwarding length to next relay (router)\n");
+						fprintf (stderr, "Error forwarding header to next relay (router)\n");
 						return -1;
 					}
-					if (gnutls_record_send (gnutls_session, (char *)&buffer, sent_length-sizeof(sent_length)) 
-						!= sent_length-sizeof(sent_length))
+					if (gnutls_record_send (gnutls_session, (char *)&payload, payload_length) 
+						!= payload_length)
 					{
-						fprintf (stderr, "Error forwarding message to next relay (router)\n");
+						fprintf (stderr, "Error forwarding payload to next relay (router)\n");
 						return -1;
 					}
 				} 
-				else //IF we are the final one
+				else // If we are the final relay
 				{
-					char * message = malloc(newsize);
-					memcpy(message,buffer+2*sizeof(int),newsize);
-					int command = ((int* )message)[0];
-					if (command == PORC_COMMAND_TRANSMIT)
-					{
+					PORC_PAYLOAD_HEADER *porc_payload_header = (PORC_PAYLOAD_HEADER *)payload;
+					int payload_content_length = paylaod_length - sizeof(PORC_PAYLOAD_HEADER);
+					void *payload_content =  (void *)(payload+sizeof(PORC_PAYLOAD_HEADER));
+					
+					switch (porc_payload_header->code) {
+					case PORC_COMMAND_TRANSMIT:
 						printf ("Received a transmit command\n");
-						ITEM_TLS_SESSION * next_tls_session;
-						ChainedListFind (&tls_session_list, porc_session->server_tls_session ,
-							(void **) &next_tls_session);
-						if (gnutls_record_send (tls_session->gnutls_session, (char *)buffer+sizeof(int), 
-							newsize-sizeof(int)) != newsize-sizeof(int))
+
+						PORC_CONTENT_TRANSMIT porc_content_transmit = (PORC_CONTENT_TRANSMIT *)payload_content;
+						int message_length = payload_content_length - sizeof(PORC_CONTENT_TRANSMIT)
+						char *message = payload_content + sizeof(PORC_CONTENT_TRANSMIT);
+
+						// Find the SOCKS session
+						CHAINED_LIST_LINK *socks_session;
+						for (socks_session=socks_session_list->first; socks_session!=NULL;
+							socks_session=socks_session->nxt)
 						{
-							fprintf (stderr, "Error transmitting final message (final node)\n");
-							return -1;
+							if (
+								(((ITEM_SOCKS_SESSION *)(socks_session->item))->client_porc_session ==
+								porc_session_id)
+							&& 	(((ITEM_SOCKS_SESSION *)(socks_session->item))->id_prev ==
+								porc_content_transmit->socks_session_id))
+							{
+								ITEM_SOCKS_SESSION *socks_session = (ITEM_SOCKS_SESSION *)(socks_session->item);
+
+								// Transmits the plain message
+								if (send (socks_session->target_socket_descriptor,
+									message, message_length, 0) != message_length) {
+								{
+									fprintf (stderr, "Error forwarding to target (router)\n");
+									return -1;
+								}
+							}
 						}
-					}
-					if (command == PORC_COMMAND_OPEN_SOCKS)
-					{
+					break;
+					case PORC_COMMAND_OPEN_SOCKS:
 						printf ("Received a open socks command\n");
-						uint32_t open_socks_ip = ntohl(*((uint32_t* )(message+4)));
-						uint16_t open_socks_port = ntohl(*((uint16_t* )(message+8)));
-						uint32_t open_socks_prev_id = ntohl(*((uint32_t* )(message+10)));
-						int target_socket_descriptor = connect_to_host(htonl(open_socks_ip), htons(open_socks_port));
+
+						PORC_COMMAND_OPEN_SOCKS_CONTENT porc_command_open_socks_content =
+							(PORC_COmmand_OPEN_SOCKS_CONTENT *)payload_content;
+
+						int target_socket_descriptor = connect_to_host (
+							htonl(porc_command_open_socks_content->ip),
+							htons(porc_command_open_socks_content->port));
 						if (target_socket_descriptor < 0)
 						{
 							fprintf (stderr, "Error connecting to host - socks - (final node)\n");
 							return -1;
 						}
-						ITEM_SOCKS_SESSION * socks_session;
-						ChainedListNew(&socks_session_list, (void **)&socks_session, sizeof(ITEM_SOCKS_SESSION));
-						socks_session->id_prev = open_socks_prev_id;
-						socks_session->client_porc_session = c->id;
+
+						// Recod the socks session
+						ITEM_SOCKS_SESSION *socks_session;
+						int socks_session_id = ChainedListNew (&socks_session_list, (void **)&socks_session,
+							sizeof(ITEM_SOCKS_SESSION));
+						socks_session->id_prev = porc_command_open_socks_content->socks_session_id;
+						socks_session->client_porc_session = porc_session_id;
 						socks_session->target_socket_descriptor = target_socket_descriptor;
-					}
-					if (command == PORC_COMMAND_OPEN_PORC)
-					{
+						ChainedListComplete (&socks_session_list, socks_session_id);
+					break;
+					case PORC_COMMAND_ASK_KEY:
+						// Opens a tls connection if it doesn't exist
+					break;
+					case PORC_COMMAND_OPEN_PORC:
+						// Find the tls connection created by a PORC_COMMAND_ASK_KEY command
+//...
 						gnutls_session_t target_gnutls_session;
 						printf ("Received a open porc command\n");
 						uint32_t open_porc_ip = ntohl(*((uint32_t* )(message+4)));
@@ -407,16 +444,21 @@ int process_porc_packet(int tls_session_id) {
 						
 						porc_session->server_tls_session = tls_session_id;
 						porc_session->final = 0;
-					}
-					if (command == PORC_COMMAND_CLOSE_SOCKS)
-					{
+					break;
+					case PORC_COMMAND_CLOSE_SOCKS:
 						//
-					}
-					if (command == PORC_COMMAND_CLOSE_PORC)
-					{
+
+					break;
+					case PORC_COMMAND_CLOSE_PORC:
 						//
+					break;
+					default;
+						fprintf (stderr, "Wrong command\n");
+						return -1;
 					}
 				}
+
+				free (payload);
 				return 0;
 			}
 		}
@@ -457,8 +499,10 @@ int process_porc_packet(int tls_session_id) {
 						fprintf (stderr, "Error forwarding message to next relay (router)\n");
 						return -1;
 					}				
+
+				free (payload);
+				return 0;
 			}
-			return 0;
 		}
 	}
 	else 

@@ -3,73 +3,98 @@
 int nbr_relays = 0;
 MYSOCKET *list_relays = NULL;
 
-int porc_recv (PORC_RESPONSE *porc_response, char *message, size_t *message_length)
+int porc_recv (PORC_RESPONSE *porc_response, char *payload, size_t *payload_length)
 {
-	int porc_packet_size;
-	if (gnutls_record_recv (client_circuit.relay1_gnutls_session, (char*)&porc_packet_size , sizeof(porc_packet_size))
-		!= sizeof(porc_packet_size))
+	PORC_PACKET_HEADER porc_packet_header;
+	if (gnutls_record_recv (client_circuit.relay1_gnutls_session, (char*)&porc_packet_header , sizeof(porc_packet_header))
+		!= sizeof(porc_packet_header))
 	{
-		fprintf (stderr, "Failed to receive the size of the packet in porc_recv\n");
+		fprintf (stderr, "Failed to receive the header of the packet in porc_recv\n");
+		return -1;
+	}
+	if (porc_packet_header->length > PORC_MAX_PACKET_LENGTH) {
+		fprintf (stderr, "Packet to long (porc_recv())\n");
+		return -1;
+	}
+	if (porc_packet_header->length <= sizeof(PORC_PACKET_HEADER)) {
+		fprintf (stderr, "Packet to short (porc_recv())\n");
+		return -1;
+	}
+	if (porc_packet_header->direction != PORC_DIRECTION_UP) {
+		fprintf (stderr, "Don't give me orders !\n");
+		return -1;
+	}
+	if (porc_packet_header->porc_session_id != CLIENT_PORC_SESSION_ID) {
+		fprintf (stderr, "Wrong PORC session id\n");
 		return -1;
 	}
 
-	char *porc_packet = malloc(porc_packet_size);
-	*(uint32_t *)porc_packet = porc_packet_size;
-	if(gnutls_record_recv (client_circuit.relay1_gnutls_session, porc_packet+sizeof(uint32_t), porc_packet_size-sizeof(uint32_t))
-		!=porc_packet_size-sizeof(uint32_t))
+	int porc_payload_length = porc_packet_header->length - sizeof(porc_packet_header);
+	char *porc_payload = malloc(porc_payload_length);
+	if(gnutls_record_recv (client_circuit.relay1_gnutls_session, porc_payload, porc_payload_length)
+		!= porc_payload_length)
 	{
-		fprintf (stderr, "Failed to receive the packet in porc_recv()\n");
+		fprintf (stderr, "Failed to receive the payload in porc_recv()\n");
 		return -1;
 	}
 
 	int i;
-	char *message_in_packet = porc_packet+sizeof(PORC_PACKET_HEADER);
-	int message_in_packet_length = porc_packet_length-sizeof(PORC_PACKET_HEADER);
 	for (i=0 ; i<client_circuit.nbr_relays; i++)
 	{
-		if (gcry_cipher_decrypt(client_circuit.gcry_cipher_hd[i], message_in_packet,
-			message_in_packet_length, NULL, 0))
+		if (gcry_cipher_decrypt(client_circuit.gcry_cipher_hd[i], porc_payload,
+			porc_payload_length, NULL, 0))
 		{
 			fprintf (stderr, "gcry_cipher_decrypt failed\n");
 			return -1;
 		}
 	}
 
-	*message_length = *(size_t*)message_in_packet;
-	if (message_length > message_in_packet_length) {
-		fprintf (stderr, "Message length too high\n");
+	PORC_PAYLOAD_HEADER *porc_payload_header = (PORC_PAYLOAD_HEADER *)porc_payload;
+
+	if (porc_payload_header->length > porc_payload_length) {
+		fprintf (stderr, "payload too long\n");
+		return -1;
+	}
+	if (porc_payload_header->length <= 0) {
+		fprintf (stderr, "payload too short\n");
 		return -1;
 	}
 
-	message = malloc (message_length);
-	memcpy (message, message_in_packet+sizeof(int), *message_length);
+	*porc_response = porc_payload_header->code;
 
-	free (porc_packet);
+	int payload_length = porc_payload_header->length-sizeof(PORC_PAYLOAD_HEADER);
+	char *payload = malloc (payload_length);
+	memcpy (payload, porc_payload+sizeof(PORC_PAYLOAD_HEADER), payload_length);
+
+	free (porc_payload);
 	return 0;
 }
 
 
-int porc_send (PORC_COMMAND command, char *message, size_t message_length)
+int porc_send (PORC_COMMAND command, char *payload, size_t payload_length)
 {
-	int crypted_message_length = ((sizeof(int)+message_length+CRYPTO_CIPHER_BLOCK_LENGTH-1)/
+	int crypted_payload_length = ((sizeof(PORC_PAYLOAD_HEADER)+payload_length+CRYPTO_CIPHER_BLOCK_LENGTH-1)/
 		CRYPTO_CIPHER_BLOCK_LENGTH)*CRYPTO_CIPHER_BLOCK_LENGTH;
-	int porc_packet_length = sizeof(PORC_PACKET_HEADER) + crypted_message_length;
+	int porc_packet_length = sizeof(PORC_PACKET_HEADER) + crypted_payload_length;
 	char *porc_packet = malloc(porc_packet_length);
 
 	PORC_PACKET_HEADER *porc_packet_header = (PORC_PACKET_HEADER *)porc_packet;
-	char *message_in_packet = porc_packet + sizeof(PORC_PACKET_HEADER);
+	char *payload_in_packet = porc_packet + sizeof(PORC_PACKET_HEADER);
+	PORC_PAYLOAD_HEADER *payload_header = (PORC_PAYLOAD_HEADER *)payload_in_packet;
 
 	porc_packet_header->length = porc_packet_length;
 	porc_packet_header->command = command;
 	porc_packet_header->direction = PORC_DIRECTION_DOWN;
-	porc_packet_header->porc_session_id = 0;
-	*(int *)message_in_packet = message_length;
-	memcpy(message_in_packet+sizeof(int), message, message_length);
-	memset (message_in_packet+sizeof(int)+message_length, 'a', crypted_message_length-(sizeof(int)+message_length));
+	porc_packet_header->porc_session_id = CLIENT_PORC_SESSION_ID;
+	payload_header->code = command;
+	payload_header->length = sizeof(PORC_PAYLOAD_HEADER)+payload_length;
+	memcpy(payload_in_packet+sizeof(PORC_PAYLOAD_HEADER), payload, payload_length);
+	memset (payload_in_packet+sizeof(PORC_PAYLOAD_HEADER)+payload_length, 'a',
+		crypted_payload_length-(sizeof(PORC_PAYLOAD_HEADER)+payload_length));
 
 	int i;
 	for (i=client_circuit.nbr_relays-1; i>=0; i--) {
-		if (gcry_cipher_encrypt(client_circuit.gcry_cipher_hd[i], message_in_packet, crypted_message_length, NULL, 0)) {
+		if (gcry_cipher_encrypt(client_circuit.gcry_cipher_hd[i], payload_in_packet, crypted_payload_length, NULL, 0)) {
 			fprintf (stderr, "gcry_cipher_encrypt failed\n");
 			return -1;
 		}

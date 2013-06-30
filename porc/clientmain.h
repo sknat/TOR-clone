@@ -15,6 +15,9 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
+#include <gcrypt.h>
+
+
 #include "socksproto.h"
 #include "config.h"
 #include "mytcp.h"
@@ -24,8 +27,6 @@
 #include "select.h"
 #include "porc.h"
 #include "signaling.h"
-#include "aes.h"
-#include "rsa.h"
 
 extern CHAINED_LIST socks_session_list;
 

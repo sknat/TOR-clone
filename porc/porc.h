@@ -55,17 +55,38 @@ typedef struct {
 #define PORC_DIRECTION_DOWN 3
 #define PORC_DIRECTION_UP 2
 
-typedef struct
-	uint32_t length;			// length of the whole packet
-	PORC_COMMAND command;
+
+
+
+//commands for the end of the tunnel.
+typedef uint16_t PORC_PAYLOAD_CODE;
+typedef PORC_PAYLOAD_CODE PORC_COMMAND;
+typedef PORC_PAYLOAD_CODE PORC_RESPONSE;
+
+typedef uint32_t PORC_LENGTH;
+
+
+
+typedef struct {
+	PORC_LENGTH length;			// length of the whole packet
 	uint8_t direction;
 	uint32_t porc_session_id;
 } __attribute__((packed))	PORC_PACKET_HEADER;
 
 
-//commands for the end of the tunnel.
-typedef uint16_t PORC_COMMAND;
-typedef uint16_t PORC_RESPONSE;
+
+typedef struct {
+	PORC_PAYLOAD_CODE code;
+	PORC_LENGTH length;			// length of the payload minus the extra bytes in the last cipher block
+} __attribute__((packed))	PORC_PAYLOAD_HEADER;
+
+
+#define PORC_COMMAND_TRANSMIT		105
+typedef struct {
+	uint32_t socks_session_id;
+	// content following
+} __attribute__((packed))	PORC_CONTENT_TRANSMIT;
+
 
 #define PORC_COMMAND_OPEN_SOCKS		100
 typedef struct {
@@ -109,22 +130,16 @@ typedef struct {
 #define PORC_COMMAND_CLOSE_SOCKS 	103
 typedef struct {
 	uint32_t socks_session_id;
-} __attribute__((packed))	PORC_RESPONSE_OPEN_SOCKS_CONTENT;
+} __attribute__((packed))	PORC_COMMAND_CLOSE_SOCKS_CONTENT;
 
 #define PORC_RESPONSE_CLOSE_SOCKS 	203
 typedef struct {
 	uint32_t socks_session_id;
-} __attribute__((packed))	PORC_RESPONSE_OPEN_SOCKS_CONTENT;
+} __attribute__((packed))	PORC_RESPONSE_CLOSE_SOCKS_CONTENT;
 
 #define PORC_COMMAND_CLOSE_PORC		104
 
 #define PORC_RESPONSE_CLOSE_PORC	204
-
-#define PORC_COMMAND_TRANSMIT		105
-typedef struct {
-	uint32_t socks_session_id;
-	// content following
-} __attribute__((packed))	PORC_CONTENT_TRANSMIT;
 
 
 
