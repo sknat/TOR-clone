@@ -10,14 +10,11 @@
 	This function returns 0 in case of success and -1 otherwise.
 */
 int new_client(int client_socket_descriptor, uint32_t ip, uint16_t port) {
-	PORC_COMMAND porc_command;
-	PORC_ACK porc_ack;
-	MYSOCKET target;
 	int socks_session_id;
 	ITEM_CLIENT *socks_session;
 
 	// Register a new SOCKS session
-	socks_session_id = ChainedListNew (&socks_session_list, &socks_session);
+	socks_session_id = ChainedListNew (&socks_session_list, (void **)&socks_session, sizeof(ITEM_CLIENT));
 
 	// SOCKS handshake
 
@@ -26,33 +23,33 @@ int new_client(int client_socket_descriptor, uint32_t ip, uint16_t port) {
 	porc_command_open_socks_content.port = port;
 	porc_command_open_socks_content.socks_session_id = socks_session_id;
 
-	if (porc_send (PORC_COMMAND_OPEN_SOCKS, (char *)&porc_command_open_socks_content,
+	if (client_porc_send (PORC_COMMAND_OPEN_SOCKS, (char *)&porc_command_open_socks_content,
 		sizeof (porc_command_open_socks_content)) != 0)
 	{
 		fprintf (stderr, "Error PORC_COMMAND_OPEN_SOCKS (100)\n");
-		ChainedListDelete (&socks_session_list, socks_session_id);
+		ChainedListRemove (&socks_session_list, socks_session_id);
 		close (client_socket_descriptor);
 		return -1;	
 	}
 
 	int response_length;
 	PORC_RESPONSE_OPEN_SOCKS_CONTENT *porc_response_open_socks_content;
-	if (porc_recv (client_circuit.session, (char *)&porc_response_open_socks_content, &response_length) != 0)
+	if (client_porc_recv (client_circuit.relay1_gnutls_session, (char *)&porc_response_open_socks_content, &response_length) != 0)
 	{
 		fprintf (stderr, "Error PORC_COMMAND_OPEN_SOCKS (250)\n");
-		ChainedListDelete (&socks_session_list, socks_session_id);
+		ChainedListRemove (&socks_session_list, socks_session_id);
 		close (client_socket_descriptor);
 		return -1;	
 	}
 	if (porc_response_open_socks_content->status != PORC_STATUS_SUCCESS) {
 		printf ("Impossible to join target\n");
-		ChainedListDelete (&socks_session_list, socks_session_id);
+		ChainedListRemove (&socks_session_list, socks_session_id);
 		close (client_socket_descriptor);
 		return 0;
 	}
 	if (porc_response_open_socks_content->socks_session_id !=socks_session_id) {
 		printf ("Wrong socks session id\n");
-		ChainedListDelete (&socks_session_list, socks_session_id);
+		ChainedListRemove (&socks_session_list, socks_session_id);
 		close (client_socket_descriptor);
 		return 0;
 	}

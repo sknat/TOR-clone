@@ -23,7 +23,7 @@ int main(int argc, char**argv)
 	SOCKS4Response response;
 	char username = '\0';
 	char sendline[32]="GET / HTTP1.0\r\n\r\n";
-	char buffer[SOCKS_MAX_BUFFER_SIZE+1];
+	char buffer[SOCKS_BUFFER_SIZE+1];
 
 	socket_descriptor = socket (AF_INET, SOCK_STREAM, 0);
 
@@ -75,7 +75,7 @@ int main(int argc, char**argv)
 	}
 
 	for (;;) {
-		if((ret = recv(socket_descriptor, buffer, SOCKS_MAX_BUFFER_SIZE, 0)) > 0) {
+		if((ret = recv(socket_descriptor, buffer, SOCKS_BUFFER_SIZE, 0)) > 0) {
 			buffer[ret] = '\0';
 			printf ("Received a response ! (%d) : %s\n", ret, buffer);
 		} else {

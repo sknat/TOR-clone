@@ -3,43 +3,43 @@
 int nbr_relays = 0;
 MYSOCKET *list_relays = NULL;
 
-int porc_recv (PORC_RESPONSE *porc_response, char *payload, size_t *payload_length)
+int client_porc_recv (PORC_RESPONSE *porc_response, char **payload, size_t *payload_length)
 {
 	PORC_PACKET_HEADER porc_packet_header;
 	if (gnutls_record_recv (client_circuit.relay1_gnutls_session, (char*)&porc_packet_header , sizeof(porc_packet_header))
 		!= sizeof(porc_packet_header))
 	{
-		fprintf (stderr, "Failed to receive the header of the packet in porc_recv\n");
+		fprintf (stderr, "Failed to receive the header of the packet in client_porc_recv\n");
 		return -1;
 	}
-	if (porc_packet_header->length > PORC_MAX_PACKET_LENGTH) {
-		fprintf (stderr, "Packet to long (porc_recv())\n");
+	if (porc_packet_header.length > PORC_MAX_PACKET_LENGTH) {
+		fprintf (stderr, "Packet to long (client_porc_recv())\n");
 		return -1;
 	}
-	if (porc_packet_header->length <= sizeof(PORC_PACKET_HEADER)) {
-		fprintf (stderr, "Packet to short (porc_recv())\n");
+	if (porc_packet_header.length <= sizeof(PORC_PACKET_HEADER)) {
+		fprintf (stderr, "Packet to short (client_porc_recv())\n");
 		return -1;
 	}
-	if (porc_packet_header->direction != PORC_DIRECTION_UP) {
+	if (porc_packet_header.direction != PORC_DIRECTION_UP) {
 		fprintf (stderr, "Don't give me orders !\n");
 		return -1;
 	}
-	if (porc_packet_header->porc_session_id != CLIENT_PORC_SESSION_ID) {
+	if (porc_packet_header.porc_session_id != CLIENT_PORC_SESSION_ID) {
 		fprintf (stderr, "Wrong PORC session id\n");
 		return -1;
 	}
 
-	int porc_payload_length = porc_packet_header->length - sizeof(porc_packet_header);
+	int porc_payload_length = porc_packet_header.length - sizeof(porc_packet_header);
 	char *porc_payload = malloc(porc_payload_length);
 	if(gnutls_record_recv (client_circuit.relay1_gnutls_session, porc_payload, porc_payload_length)
 		!= porc_payload_length)
 	{
-		fprintf (stderr, "Failed to receive the payload in porc_recv()\n");
+		fprintf (stderr, "Failed to receive the payload in client_porc_recv()\n");
 		return -1;
 	}
 
 	int i;
-	for (i=0 ; i<client_circuit.nbr_relays; i++)
+	for (i=0 ; i<client_circuit.length; i++)
 	{
 		if (gcry_cipher_decrypt(client_circuit.gcry_cipher_hd[i], porc_payload,
 			porc_payload_length, NULL, 0))
@@ -62,16 +62,16 @@ int porc_recv (PORC_RESPONSE *porc_response, char *payload, size_t *payload_leng
 
 	*porc_response = porc_payload_header->code;
 
-	int payload_length = porc_payload_header->length-sizeof(PORC_PAYLOAD_HEADER);
-	char *payload = malloc (payload_length);
-	memcpy (payload, porc_payload+sizeof(PORC_PAYLOAD_HEADER), payload_length);
+	*payload_length = porc_payload_header->length-sizeof(PORC_PAYLOAD_HEADER);
+	*payload = malloc (*payload_length);
+	memcpy (*payload, porc_payload+sizeof(PORC_PAYLOAD_HEADER), *payload_length);
 
 	free (porc_payload);
 	return 0;
 }
 
 
-int porc_send (PORC_COMMAND command, char *payload, size_t payload_length)
+int client_porc_send (PORC_COMMAND command, char *payload, size_t payload_length)
 {
 	int crypted_payload_length = ((sizeof(PORC_PAYLOAD_HEADER)+payload_length+CRYPTO_CIPHER_BLOCK_LENGTH-1)/
 		CRYPTO_CIPHER_BLOCK_LENGTH)*CRYPTO_CIPHER_BLOCK_LENGTH;
@@ -83,7 +83,6 @@ int porc_send (PORC_COMMAND command, char *payload, size_t payload_length)
 	PORC_PAYLOAD_HEADER *payload_header = (PORC_PAYLOAD_HEADER *)payload_in_packet;
 
 	porc_packet_header->length = porc_packet_length;
-	porc_packet_header->command = command;
 	porc_packet_header->direction = PORC_DIRECTION_DOWN;
 	porc_packet_header->porc_session_id = CLIENT_PORC_SESSION_ID;
 	payload_header->code = command;
@@ -93,7 +92,7 @@ int porc_send (PORC_COMMAND command, char *payload, size_t payload_length)
 		crypted_payload_length-(sizeof(PORC_PAYLOAD_HEADER)+payload_length));
 
 	int i;
-	for (i=client_circuit.nbr_relays-1; i>=0; i--) {
+	for (i=client_circuit.length-1; i>=0; i--) {
 		if (gcry_cipher_encrypt(client_circuit.gcry_cipher_hd[i], payload_in_packet, crypted_payload_length, NULL, 0)) {
 			fprintf (stderr, "gcry_cipher_encrypt failed\n");
 			return -1;
@@ -102,7 +101,7 @@ int porc_send (PORC_COMMAND command, char *payload, size_t payload_length)
 
 	if (gnutls_record_send (client_circuit.relay1_gnutls_session, porc_packet, porc_packet_length) != porc_packet_length)
 	{
-		fprintf (stderr, "Incorrect expected size to be sent in porc_send()\n");
+		fprintf (stderr, "Incorrect expected size to be sent in client_porc_send()\n");
 		return -1;
 	}
 
@@ -116,7 +115,7 @@ int set_symmetric_key (char **key_crypted, int *key_crypted_length, char *public
 	// import the key
 	gcry_sexp_t sexp_public_key;
 	printf ("we got to import : \n\"%s\"\n", public_key);
-	if (gcry_sexp_new(sexp_public_key, public_key, public_key_length, 1)) 
+	if (gcry_sexp_new (&sexp_public_key, public_key, public_key_length, 1)) 
 	{
 		fprintf(stderr,"Failed to import key\n");
 		return -1;
@@ -128,7 +127,7 @@ int set_symmetric_key (char **key_crypted, int *key_crypted_length, char *public
 	char init_vector [CRYPTO_CIPHER_BLOCK_LENGTH];
 	gcry_randomize (symmetric_key, CRYPTO_CIPHER_KEY_LENGTH, GCRY_VERY_STRONG_RANDOM);
 	gcry_randomize (init_vector, CRYPTO_CIPHER_BLOCK_LENGTH, GCRY_STRONG_RANDOM);
-	if (gcry_cipher_open (&(client_circuit.gcry_cipher_hd[relay_index]), GCRY_CIPHER, GCRY_CIPHER_MODE_CBC, 0)) {
+	if (gcry_cipher_open (&(client_circuit.gcry_cipher_hd[relay_index]), CRYPTO_CIPHER, GCRY_CIPHER_MODE_CBC, 0)) {
 		fprintf (stderr, "gcry_cipher_open failed\n");
 		return -1;
 	}
@@ -144,8 +143,8 @@ int set_symmetric_key (char **key_crypted, int *key_crypted_length, char *public
 	// Encrypt symmetric key with public key
 
 	char key_plain [CRYPTO_CIPHER_KEY_LENGTH+CRYPTO_CIPHER_BLOCK_LENGTH];
-	memcpy (key_plain+0, symmetric_key);
-	memcpy (key_plain+CRYPTO_CIPHER_KEY_LENGTH, init_vector);
+	memcpy (key_plain+0, symmetric_key, CRYPTO_CIPHER_KEY_LENGTH);
+	memcpy (key_plain+CRYPTO_CIPHER_KEY_LENGTH, init_vector, CRYPTO_CIPHER_BLOCK_LENGTH);
 
 	gcry_sexp_t sexp_plain;
 	gcry_sexp_t sexp_crypted;
@@ -173,9 +172,9 @@ int set_symmetric_key (char **key_crypted, int *key_crypted_length, char *public
 	}
 
 	// SExpression to String Conversion
-	*key_crypted_length = gcry_sexp_sprint (sexp_crypted, OUT_MODE, NULL, 0);
-	*key_crypted = malloc (length_out);
-	if(gcry_sexp_sprint(sexp_crypted, OUT_MODE, *key_crypted, *key_crypted_length) == 0) 
+	*key_crypted_length = gcry_sexp_sprint (sexp_crypted, GCRYSEXP_FMT_ADVANCED, NULL, 0);
+	*key_crypted = malloc (*key_crypted_length);
+	if(gcry_sexp_sprint(sexp_crypted, GCRYSEXP_FMT_ADVANCED, *key_crypted, *key_crypted_length) == 0) 
 	{
 		printf("Error while printing encrypted result");
 		return -1;
@@ -275,7 +274,7 @@ int client_circuit_init (int circuit_length) {
 	gcry_randomize(&r,4,GCRY_STRONG_RANDOM);
 	r = r % nbr_relays;		
 
-	client_circuit.nbr_relays = 0;
+	client_circuit.length = 0;
 
 	// Connect with tls to this relay
 	if (mytls_client_session_init (list_relays[r].ip, list_relays[r].port,
@@ -297,21 +296,21 @@ int client_circuit_init (int circuit_length) {
 		return -1;	
 	}
 	//Wait for Public key
-	PORC_HANDSHAKE_RESPONSE_HEADER porc_handshake_response_header;
-	if (gnutls_record_recv (client_circuit.relay1_gnutls_session, (char *)&porc_handshake_response, sizeof (porc_handshake_response))
-		!= sizeof (porc_handshake_response))
+	PORC_HANDSHAKE_KEY_HEADER porc_handshake_key_header;
+	if (gnutls_record_recv (client_circuit.relay1_gnutls_session, (char *)&porc_handshake_key_header, sizeof (porc_handshake_key_header))
+		!= sizeof (porc_handshake_key_header))
 	{
 		fprintf (stderr, "Error recieving public key from Router[0]\n");
 		return -1;	
 	}
-	if (porc_handshake_response.status != PUB_KEY_SUCCESS)
+	if (porc_handshake_key_header.status != PORC_STATUS_SUCCESS)
 	{
 		fprintf (stderr, "Router[0] returned Error when asked for public key\n");
 		return -1;
 	}
-	char *public_key = malloc (porc_handshake_response.length);
-	if (gnutls_record_recv (client_circuit.relay1_gnutls_session, public_key, porc_handshake_response.length)
-		!= sizeof (porc_handshake_response.length))
+	char *public_key = malloc (porc_handshake_key_header.key_length);
+	if (gnutls_record_recv (client_circuit.relay1_gnutls_session, public_key, porc_handshake_key_header.key_length)
+		!= sizeof (porc_handshake_key_header.key_length))
 	{
 		fprintf (stderr, "Error receiving public key from Router[0]\n");
 		return -1;	
@@ -320,7 +319,7 @@ int client_circuit_init (int circuit_length) {
 
 	char *key_crypted;
 	int key_crypted_length;
-	if (set_symmetric_key (&key_crypted, &key_crypted_length, public_key, porc_handshake_response.length, 0) {
+	if (set_symmetric_key (&key_crypted, &key_crypted_length, public_key, porc_handshake_key_header.key_length, 0) != 0) {
 		fprintf (stderr, "Error setting a key for Router[0]\n");
 		return -1;
 	}
@@ -344,25 +343,24 @@ int client_circuit_init (int circuit_length) {
 	}
 	free (key_crypted);
 
-	PUBLIC_HANDLSHAKE_ACK porc_handshake_ack;
+	PORC_HANDSHAKE_ACK porc_handshake_ack;
 	if (gnutls_record_recv (client_circuit.relay1_gnutls_session, (char *)&porc_handshake_ack, sizeof (porc_handshake_ack))
 		!= sizeof (porc_handshake_ack))
 	{
 		fprintf (stderr, "Error receiving acknowledgment from Router[0]\n");
 		return -1;	
 	}
-	if (porc_handshake_ack.status != PUB_KEY_SUCCESS)
+	if (porc_handshake_ack.status != PORC_STATUS_SUCCESS)
 	{
 		fprintf (stderr, "Router[0] returned Error as ACK\n");
 		return -1;
 	}
 	client_circuit.length++;
 
-	PORC_COMMAND command;
 	PORC_RESPONSE response;
-	int reponse_length;
+	size_t response_length;
 	int router_index;
-	for (router_index=1; router_index<client_circuit.nbr_relays; router_index++)
+	for (router_index=1; router_index<circuit_length; router_index++)
 	{
 		// Select a random relay
 		int r;
@@ -373,24 +371,24 @@ int client_circuit_init (int circuit_length) {
 		PORC_COMMAND_ASK_KEY_CONTENT porc_command_ask_key_content;
 		porc_command_ask_key_content.ip = htonl(list_relays[r].ip);
 		porc_command_ask_key_content.port = htons(list_relays[r].port);
-		if (porc_send (PORC_COMMAND_ASK_KEY, (char *)&porc_command_ask_key_content, sizeof (porc_command_ask_key_content)) != 0) 
+		if (client_porc_send (PORC_COMMAND_ASK_KEY, (char *)&porc_command_ask_key_content, sizeof (porc_command_ask_key_content)) != 0) 
 		{
 			return -1;	
 		}
 
 		//Wait for Public key
 		PORC_RESPONSE_ASK_KEY_CONTENT *porc_response_ask_key_content;
-		if (porc_recv (&response, (char *)&porc_response_ask_key_content, &response_length) != 0) {
+		if (client_porc_recv (&response, (char **)&porc_response_ask_key_content, &response_length) != 0)
 		{
 			fprintf (stderr, "Error recieving public key from Router[%i]\n",router_index);
 			return -1;	
 		}
-		if (response != PORC_RESPONSE_ASK_KEY) {
+		if (response != PORC_RESPONSE_ASK_KEY)
 		{
 			fprintf (stderr, "Error recieving public key from Router[%i] : wrong response\n",router_index);
 			return -1;	
 		}
-		if (response_length < sizeof(PORC_RESPONSE_ASK_KEY_CONTENT)) {
+		if (response_length < sizeof(PORC_RESPONSE_ASK_KEY_CONTENT))
 		{
 			fprintf (stderr, "Error recieving public key from Router[%i] : too short\n",router_index);
 			return -1;	
@@ -401,14 +399,15 @@ int client_circuit_init (int circuit_length) {
 			return -1;
 		}
 		if ((porc_response_ask_key_content->ip != porc_command_ask_key_content.ip) ||
-			(porc_response_ask_key_content->port != porc_command_ask_key_content.port)) {
+			(porc_response_ask_key_content->port != porc_command_ask_key_content.port))
 		{
 			fprintf (stderr, "Wrong ip or port\n");
 		}
 		printf("public key received\n");
 
-		if (set_symmetric_key (&key_crypted, &key_crypted_length, porc_response_ask_key_content+sizeof(PORC_RESPONSE_ASK_KEY_CONTENT),
-			response_length-sizeof(PORC_RESPONSE_ASK_KEY_CONTENT), router_index)
+		if (set_symmetric_key (&key_crypted, &key_crypted_length,
+			(char *)porc_response_ask_key_content+sizeof(PORC_RESPONSE_ASK_KEY_CONTENT),
+			response_length-sizeof(PORC_RESPONSE_ASK_KEY_CONTENT), router_index))
 		{
 			fprintf (stderr, "Error setting a key for Router[%i]\n", router_index);
 			return -1;
@@ -418,11 +417,11 @@ int client_circuit_init (int circuit_length) {
 		// Send the crypted symmetric key
 		char *porc_content_open_porc = malloc(sizeof(PORC_CONTENT_OPEN_PORC_HEADER)+key_crypted_length);
 		PORC_CONTENT_OPEN_PORC_HEADER *porc_content_open_porc_header = (PORC_CONTENT_OPEN_PORC_HEADER *)porc_content_open_porc;
-		porc_content_open_porc->ip = porc_command_ask_key_content.ip;
-		porc_content_open_porc->port = porc_command_ask_key_content.port;
+		porc_content_open_porc_header->ip = porc_command_ask_key_content.ip;
+		porc_content_open_porc_header->port = porc_command_ask_key_content.port;
 		memcpy (porc_content_open_porc+sizeof(PORC_CONTENT_OPEN_PORC_HEADER), key_crypted, key_crypted_length);
-		free (crypted_key);
-		if (porc_send (PORC_COMMAND_OPEN_PORC, (char *)&porc_content_open_porc,
+		free (key_crypted);
+		if (client_porc_send (PORC_COMMAND_OPEN_PORC, (char *)&porc_content_open_porc,
 			sizeof(PORC_CONTENT_OPEN_PORC_HEADER)+key_crypted_length) != 0)
 		{
 			return -1;	
@@ -431,17 +430,17 @@ int client_circuit_init (int circuit_length) {
 
 		// Wait for an acknowlegdment
 		PORC_RESPONSE_OPEN_PORC_CONTENT *porc_response_open_porc_content;
-		if (porc_recv (&response, (char *)&porc_response_open_porc_content, &response_length) != 0) {
+		if (client_porc_recv (&response, (char **)&porc_response_open_porc_content, &response_length) != 0)
 		{
 			fprintf (stderr, "Error during acknowledgment from Router[%i]\n",router_index);
 			return -1;	
 		}
-		if (response != PORC_RESPONSE_OPEN_PORC) {
+		if (response != PORC_RESPONSE_OPEN_PORC)
 		{
 			fprintf (stderr, "Error during acknowledgment from Router[%i] : wrong response (2)\n",router_index);
 			return -1;	
 		}
-		if (response_length < sizeof(PORC_RESPONSE_OPEN_PORC_CONTENT)) {
+		if (response_length < sizeof(PORC_RESPONSE_OPEN_PORC_CONTENT))
 		{
 			fprintf (stderr, "Error during acknowledgment from Router[%i] : too short\n",router_index);
 			return -1;	
@@ -462,6 +461,7 @@ int client_circuit_init (int circuit_length) {
 }
 
 int client_circuit_free () {
+/*
 	while (presentkeys>0)
 	{
 		char * msg = malloc(sizeof(int));
@@ -495,7 +495,7 @@ int client_circuit_free () {
 	}
 	close (client_circuit.relay1_socket_descriptor);
 	gnutls_deinit (client_circuit.session);
-
+*/
 	return 0;
 }
 

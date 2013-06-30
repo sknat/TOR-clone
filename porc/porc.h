@@ -125,7 +125,7 @@ typedef struct {
 #define PORC_RESPONSE_OPEN_PORC		202		// Send sym key crypted by public key to open a new PORC connection
 typedef struct {
 	uint8_t status;
-} __attribute__((packed))	PORC_CONTENT_OPEN_PORC;
+} __attribute__((packed))	PORC_RESPONSE_OPEN_PORC_CONTENT;
 
 #define PORC_COMMAND_CLOSE_SOCKS 	103
 typedef struct {

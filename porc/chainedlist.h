@@ -9,6 +9,7 @@
 #include <gnutls/x509.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <gcrypt.h>
 #include "config.h"
 
 

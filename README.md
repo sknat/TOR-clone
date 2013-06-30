@@ -5,6 +5,7 @@ INF441
 SECURITY:
 * a thread should be spawn before every blocking operation
 * control inputs (particularly lengths to allocate)
+* PORC handshake insecurity
 
 TODO :
 * ajouter la license GPL2

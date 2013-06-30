@@ -53,7 +53,7 @@ int create_listen_socket(int port) {
 		return -1;
 	}
 
-	if (listen(server_socket_descriptor, MAXPENDING) < 0) {
+	if (listen(server_socket_descriptor, SOCKS_MAX_PENDING) < 0) {
 		fprintf (stderr, "Listen error.\n");
 		return -1;
 	}
