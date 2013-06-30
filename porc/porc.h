@@ -160,7 +160,7 @@ typedef struct {
 typedef struct {
 	uint8_t command;
 	uint32_t porc_session_id;	
-	uint16_t key_length;		// crypted symmetric key + init vector bytes following
+	PORC_LENGTH key_length;		// key_length bytes following
 } __attribute__((packed))	PORC_HANDSHAKE_NEW;
 
 typedef struct {

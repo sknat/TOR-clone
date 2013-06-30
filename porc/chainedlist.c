@@ -47,7 +47,7 @@ int ChainedListFind (CHAINED_LIST* p, int id, void **item)
 	{
 		if (c->id==id) 
 		{
-			*item = &(c->item);
+			*item = c->item;
 			return 0;
 		}
 		c = c->nxt;
@@ -86,6 +86,8 @@ int ChainedListNew (CHAINED_LIST *p, void **item, int item_size)
 
 	
 	*item = el->item;
+
+	printf ("ChainedListNew : new el %d at %d\n", el->id, (int)(el->item));
 	
 	return el->id;
 }

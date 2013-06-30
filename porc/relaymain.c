@@ -57,6 +57,7 @@ int handle_connection(int client_socket_descriptor) {
 	int tls_session_id = ChainedListNew (&tls_session_list, (void**) &tls_session, sizeof(ITEM_TLS_SESSION));
 	tls_session->socket_descriptor = client_socket_descriptor;
 	tls_session->gnutls_session = gnutls_session;
+	printf ("tls_session %d created, gnutls_session : %d\n", (int)tls_session, (int)gnutls_session);
 
 	// Start a PORC session
 	// wait for asking public key
@@ -78,15 +79,20 @@ int handle_connection(int client_socket_descriptor) {
 	// Send public Key
 
 	int public_key_length = gcry_sexp_sprint (public_key, GCRYSEXP_FMT_ADVANCED, NULL, 0);
+	printf ("key length : %d\n", public_key_length);
+
 	int message_length = sizeof(PORC_HANDSHAKE_KEY_HEADER)+public_key_length;
 	char *message = malloc (message_length);
 	PORC_HANDSHAKE_KEY_HEADER *porc_handshake_key_header = (PORC_HANDSHAKE_KEY_HEADER *)message;
-	if (gcry_sexp_sprint(public_key, GCRYSEXP_FMT_ADVANCED, message+sizeof(PORC_HANDSHAKE_KEY_HEADER), public_key_length) != 0) 
+
+	if (gcry_sexp_sprint(public_key, GCRYSEXP_FMT_ADVANCED, message+sizeof(PORC_HANDSHAKE_KEY_HEADER), public_key_length) < 0) 
 	{
-		printf("Error while exporting key");
+		fprintf(stderr, "Error while exporting key\n");
 		free (message);
 		return -1;
 	}
+
+	printf ("public key : \"%s\"\n", message+sizeof(PORC_HANDSHAKE_KEY_HEADER));
 
 	porc_handshake_key_header->status = PORC_STATUS_SUCCESS;
 	porc_handshake_key_header->key_length = public_key_length;
@@ -117,14 +123,17 @@ int handle_connection(int client_socket_descriptor) {
 		fprintf (stderr, "Error : crypted key too long\n");
 		return -1;
 	}
+	printf ("crypted key length : %d\n", porc_handshake_new.key_length);
 	char *crypted_key = malloc (porc_handshake_new.key_length);
-	if (gnutls_record_recv (gnutls_session, (char *)&crypted_key, 
+	if (gnutls_record_recv (gnutls_session, crypted_key, 
 		porc_handshake_new.key_length) != porc_handshake_new.key_length) 
 	{
 		fprintf (stderr, "Error while awaiting symmetric key (2)\n");
 		return -1;	
 	}
-	printf ("Received sym key\n");
+	printf ("Received sym key : \"%s\"\n", crypted_key);
+
+	
 
 	// Decrypt the sym key
 
@@ -149,11 +158,34 @@ int handle_connection(int client_socket_descriptor) {
 		return -1;
 	}
 
+	printf ("plain key : \"%s\"\n", key_plain);
+
 	free (crypted_key);
 	gcry_sexp_release(sexp_crypted);
 	gcry_sexp_release(sexp_plain);
 
+	// Convert hex representation to natural representation
+	int i;
+	int j = 0;
+	if ((key_plain[1] == '0') && (key_plain[2] == '0')) {
+		j = 2;
+	}
+	for (i=j+1; i<j+1+2*(CRYPTO_CIPHER_KEY_LENGTH+CRYPTO_CIPHER_BLOCK_LENGTH); i++) {
+		if ((key_plain[i] >= 'A') && (key_plain[i] <= 'F')) {
+			key_plain[i] = key_plain[i] - 'A' + 10;
+		} else if ((key_plain[i] >= '0') && (key_plain[i] <= '9')) {
+			key_plain[i] = key_plain[i] - '0';
+		} else {
+			printf("Error processing sym key\n");
+			return -1;
+		}
+	}
+	for (i=0; i<CRYPTO_CIPHER_KEY_LENGTH+CRYPTO_CIPHER_BLOCK_LENGTH; i++) {
+		key_plain[i] = key_plain[1+j+2*i]*16 + key_plain[1+j+2*i+1];
+	}
+
 	printf ("sym key decrypted\n");
+	printf ("first bytes of sym key : %d, %d, %d, %d\n", key_plain[0], key_plain[1], key_plain[2], key_plain[3]);
 
 	// Create a gcrypt context
 	gcry_cipher_hd_t gcry_cipher_hd;
@@ -161,11 +193,11 @@ int handle_connection(int client_socket_descriptor) {
 		fprintf (stderr, "gcry_cipher_open failed\n");
 		return -1;
 	}
-	if (gcry_cipher_setkey (gcry_cipher_hd, crypted_key+1, CRYPTO_CIPHER_KEY_LENGTH) != 0) {
+	if (gcry_cipher_setkey (gcry_cipher_hd, key_plain, CRYPTO_CIPHER_KEY_LENGTH) != 0) {
 		fprintf (stderr, "gcry_cipher_setkey failed\n");
 		return -1;
 	}
-	if (gcry_cipher_setiv (gcry_cipher_hd, crypted_key+1+CRYPTO_CIPHER_KEY_LENGTH, CRYPTO_CIPHER_BLOCK_LENGTH) != 0) {
+	if (gcry_cipher_setiv (gcry_cipher_hd, key_plain+CRYPTO_CIPHER_KEY_LENGTH, CRYPTO_CIPHER_BLOCK_LENGTH) != 0) {
 		fprintf (stderr, "gcry_cipher_setiv failed\n");
 		return -1;
 	}
@@ -192,11 +224,11 @@ int handle_connection(int client_socket_descriptor) {
 
 	// PORC session is ready
 	ChainedListComplete (&porc_session_list, porc_session_id);
+	printf ("porc session %d recorded\n", porc_session_id);
 
 	// TLS session is ready
 	ChainedListComplete (&tls_session_list, tls_session_id);
-
-	printf ("Porc session %d recorded\n", porc_session_id);
+	printf ("tls_session %d recorded, gnutls_session : %d\n", (int)tls_session, (int)gnutls_session);
 
 	// Signaling a new available socket to the selecting thread
 	if (pthread_kill (selecting_thread, SIGUSR1) != 0) {
@@ -249,18 +281,22 @@ int set_fds (int *nfds, fd_set *fds) {
 	FD_ZERO (fds); //Initialize set
 	
 	for (c=tls_session_list.first; c!= NULL; c=c->nxt) {
-		FD_SET (((ITEM_TLS_SESSION*)(c->item))->socket_descriptor, fds);
-		n++;
-		if (((ITEM_TLS_SESSION*)(c->item))->socket_descriptor > max) {
-			max = ((ITEM_TLS_SESSION*)(c->item))->socket_descriptor;
+		if (c->complete == 1) {
+			FD_SET (((ITEM_TLS_SESSION*)(c->item))->socket_descriptor, fds);
+			n++;
+			if (((ITEM_TLS_SESSION*)(c->item))->socket_descriptor > max) {
+				max = ((ITEM_TLS_SESSION*)(c->item))->socket_descriptor;
+			}
 		}
 	}
 
 	for (c=socks_session_list.first; c!=NULL; c=c->nxt) {
-		FD_SET (((ITEM_SOCKS_SESSION*)(c->item))->target_socket_descriptor, fds);
-		n++;
-		if (((ITEM_SOCKS_SESSION*)(c->item))->target_socket_descriptor > max) {
-			max = ((ITEM_SOCKS_SESSION*)(c->item))->target_socket_descriptor;
+		if (c->complete == 1) {
+			FD_SET (((ITEM_SOCKS_SESSION*)(c->item))->target_socket_descriptor, fds);
+			n++;
+			if (((ITEM_SOCKS_SESSION*)(c->item))->target_socket_descriptor > max) {
+				max = ((ITEM_SOCKS_SESSION*)(c->item))->target_socket_descriptor;
+			}
 		}
 	}
 	*nfds = max + 1;
@@ -276,8 +312,9 @@ int process_porc_packet(int tls_session_id) {
 	gnutls_session = tls_session->gnutls_session;
 
 	printf ("A packet to process for the PORC network...\n");
+	printf ("tls_session : %d, gnutls_session : %d\n", (int)tls_session, (int)gnutls_session);
 
-	// Read the header : length, command, direction, porc_session_id
+	// Read the header : length, direction, porc_session_id
 	PORC_PACKET_HEADER porc_packet_header;
 	if (gnutls_record_recv (gnutls_session, (char *)&porc_packet_header, sizeof(porc_packet_header))
 		!= sizeof (porc_packet_header))
@@ -285,6 +322,10 @@ int process_porc_packet(int tls_session_id) {
 		fprintf (stderr, "Impossible to read the header of the PORC packet\n");
 		return -1;
 	}
+
+	printf ("(length, direction, porc_session_id) : (%d, %d, %d)\n", porc_packet_header.length, porc_packet_header.direction,
+		porc_packet_header.porc_session_id);
+
 	if (porc_packet_header.length > PORC_MAX_PACKET_LENGTH) {
 		fprintf (stderr, "Packet too long\n");
 		return -1;
@@ -293,8 +334,6 @@ int process_porc_packet(int tls_session_id) {
 		fprintf (stderr, "Packet too short\n");
 		return -1;
 	}
-
-	printf ("length of the packet : %d\n", porc_packet_header.length);
 
 	int payload_length = porc_packet_header.length-sizeof(PORC_PACKET_HEADER);
 	if (payload_length % CRYPTO_CIPHER_BLOCK_LENGTH != 0) {
@@ -365,6 +404,8 @@ int process_porc_packet(int tls_session_id) {
 			PORC_PAYLOAD_HEADER *porc_payload_header = (PORC_PAYLOAD_HEADER *)payload;
 			int payload_content_length = payload_length - sizeof(PORC_PAYLOAD_HEADER);
 			void *payload_content =  (void *)(payload+sizeof(PORC_PAYLOAD_HEADER));
+
+			printf ("We are the final relay : (length, code) = (%d, %d)\n", porc_payload_header->length, porc_payload_header->code);
 			
 			if (porc_payload_header->code == PORC_COMMAND_TRANSMIT) {
 				printf ("Received a transmit command\n");
@@ -417,7 +458,11 @@ int process_porc_packet(int tls_session_id) {
 				socks_session->client_porc_session = porc_session_id;
 				socks_session->target_socket_descriptor = target_socket_descriptor;
 				ChainedListComplete (&socks_session_list, socks_session_id);
+
 			} else if (porc_payload_header->code == PORC_COMMAND_ASK_KEY) {
+
+				printf ("Received an ask key command command\n");
+
 				struct sockaddr_in peeraddr;
 				CHAINED_LIST_LINK *c;
 				PORC_COMMAND_ASK_KEY_CONTENT *porc_command_ask_key_content =
@@ -445,6 +490,7 @@ int process_porc_packet(int tls_session_id) {
 				if (tls_session_id == -1) {
 					// Create a tls session
 
+					printf ("Need to create a new tls connection\n");
 					int socket_descriptor;
 					gnutls_session_t gnutls_session;
 					if (mytls_client_session_init (htonl(porc_command_ask_key_content->ip),
@@ -464,9 +510,10 @@ int process_porc_packet(int tls_session_id) {
 
 				// PROC handshake part I
 
+				printf ("Send a public key request\n");
 				PORC_HANDSHAKE_REQUEST porc_handshake_request;
 				porc_handshake_request.command = PORC_HANDSHAKE_REQUEST_CODE;
-				if (gnutls_record_recv (tls_session->gnutls_session, (char *)&porc_handshake_request, 
+				if (gnutls_record_send (tls_session->gnutls_session, (char *)&porc_handshake_request, 
 					sizeof (porc_handshake_request)) != sizeof (porc_handshake_request))
 				{
 					fprintf (stderr, "Error in sending public key request (router)\n");
@@ -640,9 +687,10 @@ int selecting() {
 			sleep(1);
 		}
 		if((nbr = pselect(nfds, &read_fds, 0, 0, 0, &signal_set)) > 0) {
-			printf ("pselect returned a negative integer\n");
+			printf ("pselect returned %d\n", nbr);
 			for (c=tls_session_list.first; c!=NULL; c=c->nxt) {
 				if (FD_ISSET (((ITEM_TLS_SESSION *)(c->item))->socket_descriptor, &read_fds)) {
+					printf ("tls session id : %d\n", c->id);
 					if (process_porc_packet(c->id)!=0) {
 						fprintf (stderr, "Stop (250), %d\n", c->id);
 						return -1;
@@ -651,6 +699,7 @@ int selecting() {
 			}
 			for (c=socks_session_list.first; c!=NULL; c=c->nxt) {
 				if (FD_ISSET (((ITEM_SOCKS_SESSION*)(c->item))->target_socket_descriptor, &read_fds)) {
+					printf ("socks session id : %d\n", c->id);
 					if (send_to_porc(c->id)!=0) {
 						fprintf (stderr, "Stop (270), %d\n", c->id);
 						return -1;

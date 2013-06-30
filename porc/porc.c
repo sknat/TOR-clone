@@ -140,6 +140,8 @@ int set_symmetric_key (char **key_crypted, int *key_crypted_length, char *public
 		return -1;
 	}
 
+	printf ("first bytes of sym key : %d, %d, %d, %d\n", symmetric_key[0], symmetric_key[1], symmetric_key[2], symmetric_key[3]);
+
 	// Encrypt symmetric key with public key
 
 	char key_plain [CRYPTO_CIPHER_KEY_LENGTH+CRYPTO_CIPHER_BLOCK_LENGTH];
@@ -163,6 +165,11 @@ int set_symmetric_key (char **key_crypted, int *key_crypted_length, char *public
 		return -1;
 	}
 	gcry_mpi_release (mpi_plain);
+	
+	char *buffer = malloc (gcry_sexp_sprint(sexp_plain, GCRYSEXP_FMT_ADVANCED, NULL, 0));
+	gcry_sexp_sprint(sexp_plain, GCRYSEXP_FMT_ADVANCED, buffer, gcry_sexp_sprint(sexp_plain, GCRYSEXP_FMT_ADVANCED, NULL, 0));
+	printf ("plain sym key : \"%s\"\n", buffer);
+	free (buffer);
 
 	//Encryption
 	if (gcry_pk_encrypt (&sexp_crypted, sexp_plain, sexp_public_key) != 0)
@@ -272,7 +279,7 @@ int client_circuit_init (int circuit_length) {
 	// Select a random relay
 	int r;
 	gcry_randomize(&r,4,GCRY_STRONG_RANDOM);
-	r = r % nbr_relays;		
+	r = 0;//r % nbr_relays;		
 
 	client_circuit.length = 0;
 
@@ -300,7 +307,7 @@ int client_circuit_init (int circuit_length) {
 	if (gnutls_record_recv (client_circuit.relay1_gnutls_session, (char *)&porc_handshake_key_header, sizeof (porc_handshake_key_header))
 		!= sizeof (porc_handshake_key_header))
 	{
-		fprintf (stderr, "Error recieving public key from Router[0]\n");
+		fprintf (stderr, "Error receiving public key from Router[0]\n");
 		return -1;	
 	}
 	if (porc_handshake_key_header.status != PORC_STATUS_SUCCESS)
@@ -308,11 +315,17 @@ int client_circuit_init (int circuit_length) {
 		fprintf (stderr, "Router[0] returned Error when asked for public key\n");
 		return -1;
 	}
+	if (porc_handshake_key_header.key_length > PORC_MAX_PACKET_LENGTH)
+	{
+		fprintf (stderr, "Router[0] returned Error when asked for public key : wrong length\n");
+		return -1;
+	}
+	printf ("Public key length : %d\n", porc_handshake_key_header.key_length);
 	char *public_key = malloc (porc_handshake_key_header.key_length);
 	if (gnutls_record_recv (client_circuit.relay1_gnutls_session, public_key, porc_handshake_key_header.key_length)
-		!= sizeof (porc_handshake_key_header.key_length))
+		!= porc_handshake_key_header.key_length)
 	{
-		fprintf (stderr, "Error receiving public key from Router[0]\n");
+		fprintf (stderr, "Error receiving public key from Router[0] (2)\n");
 		return -1;	
 	}
 	printf("public key received\n");
@@ -335,6 +348,7 @@ int client_circuit_init (int circuit_length) {
 		fprintf (stderr, "Error while sending Encrypted SumKey header to Router[0]\n");
 		return -1;	
 	}
+	printf ("crypted key length : %d\n", key_crypted_length);
 	if (gnutls_record_send (client_circuit.relay1_gnutls_session, key_crypted, 
 		key_crypted_length) != key_crypted_length) 
 	{
@@ -342,6 +356,7 @@ int client_circuit_init (int circuit_length) {
 		return -1;	
 	}
 	free (key_crypted);
+	printf ("Key crypted sent\n");
 
 	PORC_HANDSHAKE_ACK porc_handshake_ack;
 	if (gnutls_record_recv (client_circuit.relay1_gnutls_session, (char *)&porc_handshake_ack, sizeof (porc_handshake_ack))
@@ -365,7 +380,7 @@ int client_circuit_init (int circuit_length) {
 		// Select a random relay
 		int r;
 		gcry_randomize(&r,4,GCRY_STRONG_RANDOM);
-		r = r % nbr_relays;		
+		r = 1;//r % nbr_relays;		
 
 		// Ask for public key of next node
 		PORC_COMMAND_ASK_KEY_CONTENT porc_command_ask_key_content;
