@@ -391,7 +391,7 @@ int client_circuit_init (int circuit_length) {
 			return -1;	
 		}
 
-		//Wait for Public key
+		// Wait for Public key
 		PORC_RESPONSE_ASK_KEY_CONTENT *porc_response_ask_key_content;
 		if (client_porc_recv (&response, (char **)&porc_response_ask_key_content, &response_length) != 0)
 		{
