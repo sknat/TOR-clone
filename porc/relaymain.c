@@ -142,19 +142,22 @@ int handle_connection(int client_socket_descriptor) {
 
 	if (gcry_sexp_new(&sexp_crypted, crypted_key, porc_handshake_new.key_length, 1) != 0) 
 	{
-		printf("Error while reading the encrypted data");	
+		fprintf (stderr, "Error while reading the encrypted data\n");	
 		return -1;
 	}
+	printf ("New sexp_crypted\n");
 	if (gcry_pk_decrypt (&sexp_plain, sexp_crypted, private_key) != 0) 
 	{
-		printf("Error during the decryption");
+		fprintf (stderr, "Error during the decryption\n");
 		return -1;
 	}
+	printf ("gcry_pk_decrypt ok\n");
 	int key_plain_length = gcry_sexp_sprint (sexp_plain, GCRYSEXP_FMT_ADVANCED, NULL, 0);
+	printf ("key_plain_length = %d\n", key_plain_length);
 	char *key_plain = malloc (key_plain_length);
 	if (gcry_sexp_sprint (sexp_plain, GCRYSEXP_FMT_ADVANCED, key_plain, key_plain_length) == 0)
 	{
-		printf("Error while printing decryption result");
+		fprintf (stderr, "Error while printing decryption result\n");
 		return -1;
 	}
 
@@ -444,10 +447,12 @@ int process_porc_packet(int tls_session_id) {
 			fprintf (stderr, "Wrong tls session\n");
 			return -1;
 		}
+		printf ("first bytes of the encrypted payload : %08x\n", *(int *)payload);
 		if (gcry_cipher_decrypt (porc_session->gcry_cipher_hd, payload, payload_length, NULL, 0)) {
 			fprintf (stderr, "gcry_cipher_decrypt failed\n");
 			return -1;
 		}
+		printf ("first bytes of the encrypted payload : %08x\n", *(int *)payload);
 		if (porc_session->final == 0) 
 		{
 			//Rewrite paquet
@@ -464,7 +469,7 @@ int process_porc_packet(int tls_session_id) {
 				fprintf (stderr, "Error forwarding header to next relay (router)\n");
 				return -1;
 			}
-			if (gnutls_record_send (next_tls_session->gnutls_session, (char *)&payload, payload_length) 
+			if (gnutls_record_send (next_tls_session->gnutls_session, payload, payload_length) 
 				!= payload_length)
 			{
 				fprintf (stderr, "Error forwarding payload to next relay (router)\n");
@@ -661,8 +666,9 @@ int process_porc_packet(int tls_session_id) {
 
 				// Send the crypted key
 
-				int key_length = porc_payload_header->length - sizeof(PORC_PAYLOAD_HEADER);
-				char *key = payload_content + sizeof(PORC_PAYLOAD_HEADER);
+				int key_length = porc_payload_header->length - sizeof(PORC_PAYLOAD_HEADER)
+					- sizeof(PORC_COMMAND_OPEN_PORC_HEADER);
+				char *key = payload_content + sizeof(PORC_COMMAND_OPEN_PORC_HEADER);
 				int new_payload_length = sizeof(PORC_HANDSHAKE_NEW) + key_length;
 				char *new_payload = malloc (new_payload_length);
 				char *key_in_new_payload = new_payload + sizeof(PORC_HANDSHAKE_NEW);
@@ -672,6 +678,7 @@ int process_porc_packet(int tls_session_id) {
 				porc_handshake_new->command = PORC_HANDSHAKE_NEW_CODE;
 				porc_handshake_new->porc_session_id = porc_session_id;
 				porc_handshake_new->key_length = key_length;
+				printf ("key_length : %d\n", key_length);
 
 				memcpy (key_in_new_payload, key, key_length);
 
@@ -687,7 +694,7 @@ int process_porc_packet(int tls_session_id) {
 				
 				// Receive the acknowledgment
 				PORC_HANDSHAKE_ACK porc_handshake_ack;
-				if (gnutls_record_send (tls_session->gnutls_session, (char *)&porc_handshake_ack, 
+				if (gnutls_record_recv (tls_session->gnutls_session, (char *)&porc_handshake_ack, 
 					sizeof(porc_handshake_ack)) != sizeof(porc_handshake_ack))
 				{
 					fprintf (stderr, "Error in receiving ack from next relay (router)\n");
@@ -748,35 +755,7 @@ int process_porc_packet(int tls_session_id) {
 			fprintf (stderr, "PORC session not found\n");
 			return -1;
 		}
-/*
-		if (porc_session->client_tls_session != tls_session_id)
-		{
-			fprintf (stderr, "Wrong tls session\n");
-			return -1;
-		}
-		// Encode and send to the previous relay
-		if(aesImportKey(porc_session->sym_key,SYM_KEY_LEN)!=0)
-		{
-			fprintf(stderr,"Failed to import SYMKEY for encoding/decoding message (router)");
-			return -1;
-		}
-		size_t newsize = aesEncrypt(buffer+2*sizeof(int),length-sizeof(length)-2*sizeof(int));
-		length = newsize + 2*sizeof(int)+sizeof(length);
-		// Encode and send to the next relay
-		((int *)buffer)[1] = porc_session->id_prev;	
-		if (gnutls_record_send (gnutls_session, (char *)&length, sizeof(length)) 
-			!= sizeof(length))
-		{
-			fprintf (stderr, "Error forwarding length to next relay (router)\n");
-			return -1;
-		}
-		if (gnutls_record_send (gnutls_session, (char *)&buffer, length-sizeof(length)) 
-			!= length-sizeof(length))
-		{
-			fprintf (stderr, "Error forwarding message to next relay (router)\n");
-			return -1;
-		}				
-*/
+// encode and send
 		free (payload);
 		return 0;
 	}
@@ -853,11 +832,11 @@ int selecting() {
 		fprintf (stderr, "Impossible to prepare the signal mask.\n");
 		return -1;
 	}
-	printf ("Beginning to select\n");
 	for (;;) {
 		while (set_fds (&nfds, &read_fds) <= 0) {
 			sleep(1);
 		}
+		printf ("Beginning to select\n");
 		if((nbr = pselect(nfds, &read_fds, 0, 0, 0, &signal_set)) > 0) {
 			printf ("pselect returned %d\n", nbr);
 			for (c=tls_session_list.first; c!=NULL; c=c->nxt) {

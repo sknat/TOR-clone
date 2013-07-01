@@ -98,11 +98,13 @@ int client_porc_send (PORC_COMMAND command, char *payload, size_t payload_length
 
 	int i;
 	for (i=client_circuit.length-1; i>=0; i--) {
+		printf ("first bytes of the encrypted payload (i=%i) : %08x\n", i, *(int *)payload_in_packet);
 		if (gcry_cipher_encrypt(client_circuit.gcry_cipher_hd[i], payload_in_packet, crypted_payload_length, NULL, 0)) {
 			fprintf (stderr, "gcry_cipher_encrypt failed\n");
 			return -1;
 		}
 	}
+	printf ("first bytes of the encrypted payload (i=%i) : %08x\n", i, *(int *)payload_in_packet);
 
 	if (gnutls_record_send (client_circuit.relay1_gnutls_session, porc_packet, porc_packet_length) != porc_packet_length)
 	{
