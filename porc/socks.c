@@ -12,6 +12,7 @@
 int new_client(int client_socket_descriptor, uint32_t ip, uint16_t port) {
 	int socks_session_id;
 	ITEM_CLIENT *socks_session;
+	PORC_RESPONSE porc_response;
 
 	// Register a new SOCKS session
 	socks_session_id = ChainedListNew (&socks_session_list, (void **)&socks_session, sizeof(ITEM_CLIENT));
@@ -32,11 +33,17 @@ int new_client(int client_socket_descriptor, uint32_t ip, uint16_t port) {
 		return -1;	
 	}
 
-	int response_length;
+	size_t response_length;
 	PORC_RESPONSE_OPEN_SOCKS_CONTENT *porc_response_open_socks_content;
-	if (client_porc_recv (client_circuit.relay1_gnutls_session, (char *)&porc_response_open_socks_content, &response_length) != 0)
+	if (client_porc_recv (&porc_response, (char **)&porc_response_open_socks_content, &response_length) != 0)
 	{
 		fprintf (stderr, "Error PORC_COMMAND_OPEN_SOCKS (250)\n");
+		ChainedListRemove (&socks_session_list, socks_session_id);
+		close (client_socket_descriptor);
+		return -1;	
+	}
+	if (porc_response != PORC_RESPONSE_OPEN_SOCKS) {
+		fprintf (stderr, "Error wrong response\n");
 		ChainedListRemove (&socks_session_list, socks_session_id);
 		close (client_socket_descriptor);
 		return -1;	
