@@ -285,7 +285,7 @@ int client_circuit_init (int circuit_length) {
 
 	// Select a random relay
 	int r;
-	gcry_randomize(&r,4,GCRY_STRONG_RANDOM);
+	//gcry_randomize(&r,4,GCRY_STRONG_RANDOM);
 	r = 0;//r % nbr_relays;		
 
 	client_circuit.length = 0;
@@ -386,14 +386,15 @@ int client_circuit_init (int circuit_length) {
 	{
 		// Select a random relay
 		int r;
-		gcry_randomize(&r,4,GCRY_STRONG_RANDOM);
-		r = 1;//r % nbr_relays;		
+		//gcry_randomize(&r,4,GCRY_STRONG_RANDOM);
+		r = router_index;//r % nbr_relays;		
 
 		// Ask for public key of next node
 		printf ("Ask for public key\n");
 		PORC_COMMAND_ASK_KEY_CONTENT porc_command_ask_key_content;
 		porc_command_ask_key_content.ip = htonl(list_relays[r].ip);
 		porc_command_ask_key_content.port = htons(list_relays[r].port);
+		printf ("request key for (ip, port) = (%08x, %i)\n", porc_command_ask_key_content.ip, porc_command_ask_key_content.port);
 		if (client_porc_send (PORC_COMMAND_ASK_KEY, (char *)&porc_command_ask_key_content, sizeof (porc_command_ask_key_content)) != 0) 
 		{
 			return -1;	
@@ -480,8 +481,8 @@ int client_circuit_init (int circuit_length) {
 			return -1;
 		}
 
-		client_circuit.length++;
 		printf ("--------------New relay %i---------\n", client_circuit.length);
+		client_circuit.length++;
 		//Tunnel is now open to router[router_index]
 	}
 

@@ -32,15 +32,17 @@ int main () {
 	}
 
 	// Set up the connection to the PORC network
-	if (client_circuit_init (3) != 0) {
+	if (client_circuit_init (4) != 0) {
 		fprintf (stderr, "Error in circuit initialisation\n");
 		gnutls_certificate_free_credentials (xcred);
 		gnutls_global_deinit ();
 		return -1;
 	}
 
+	printf("Socks sessions init\n");
 	ChainedListInit (&socks_session_list);
 
+	printf("Creation of the proxy thread\n");
 	//Creates a thread to run the client proxy
 	selecting_thread = pthread_self ();
 	

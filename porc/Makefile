@@ -21,6 +21,8 @@ relay.exe:	relaymain.o mytls.o mytcp.o chainedlist.o signaling.o
 	$(CC) -o $@ relaymain.o mytls.o mytcp.o chainedlist.o signaling.o $(LIBS) -lpthread
 	cp relay.exe ./relay01/relay.exe
 	cp relay.exe ./relay02/relay.exe
+	cp relay.exe ./relay03/relay.exe
+	cp relay.exe ./relay04/relay.exe
 	
 directory.exe:	directory.o mytls.o mytcp.o
 	@echo "--------------------------------------------------------------------------------"

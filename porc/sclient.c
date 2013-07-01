@@ -68,17 +68,18 @@ int main(int argc, char**argv)
 	} else {
 		printf ("Error 400 : %d\n", response.status);
 	}
-
+	printf ("attemp to send to traget\n");
 	if(send(socket_descriptor, sendline, 17, 0) != 17) {
 		fprintf (stderr, "Err 500\n");
 		return -1;
 	}
-
+	printf ("sent to traget\n");
 	for (;;) {
 		if((ret = recv(socket_descriptor, buffer, SOCKS_BUFFER_SIZE, 0)) > 0) {
 			buffer[ret] = '\0';
 			printf ("Received a response ! (%d) : %s\n", ret, buffer);
 		} else {
+			printf ("leaving loop\n");
 			break;
 		}
 	}

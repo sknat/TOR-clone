@@ -13,6 +13,7 @@
 #include "mytcp.h"
 
 int connect_to_host(uint32_t ip, uint16_t port) {
+	printf ("Connecting to host\n");
 	struct sockaddr_in sockaddr_server;
 	int socket_descriptor;
 	int ret;
@@ -22,11 +23,12 @@ int connect_to_host(uint32_t ip, uint16_t port) {
 	bzero (&sockaddr_server, sizeof(sockaddr_server));
 	sockaddr_server.sin_family = AF_INET;
 	sockaddr_server.sin_addr.s_addr = ip;
-	sockaddr_server.sin_port = htons(port);
-
+	sockaddr_server.sin_port = port;
+	printf ("About to connect to host\n");
+	printf("ip = %08x port = %08x\n",ip,port);
 	ret = connect(socket_descriptor, (struct sockaddr*)&sockaddr_server, sizeof(sockaddr_server));
 	if (ret != 0) {
-		printf ("Connection to target failed in function connect_to_host()\n");
+		fprintf (stderr,"Connection to target failed in function connect_to_host()\n");
 		return -1;
 	}
 	printf ("Connection to target succeded\n");

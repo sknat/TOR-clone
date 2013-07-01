@@ -526,8 +526,8 @@ int process_porc_packet(int tls_session_id) {
 					fprintf (stderr, "Error connecting to host - socks - (final node)\n");
 					return -1;
 				}
-
-				// Recod the socks session
+				printf("Connection to host established\n");
+				// Recode the socks session
 				ITEM_SOCKS_SESSION *socks_session;
 				int socks_session_id = ChainedListNew (&socks_session_list, (void **)&socks_session,
 					sizeof(ITEM_SOCKS_SESSION));
@@ -535,6 +535,22 @@ int process_porc_packet(int tls_session_id) {
 				socks_session->client_porc_session = porc_session_id;
 				socks_session->target_socket_descriptor = target_socket_descriptor;
 				ChainedListComplete (&socks_session_list, socks_session_id);
+				// Send acknowledgment back to client
+				PORC_RESPONSE_OPEN_SOCKS_CONTENT porc_response_open_socks_content;
+				porc_response_open_socks_content.status = PORC_STATUS_SUCCESS;
+				porc_response_open_socks_content.socks_session_id = socks_session->id_prev;
+				if (relay_porc_send (PORC_RESPONSE_OPEN_SOCKS, porc_session->id_prev, (char *)&porc_response_open_socks_content,
+					sizeof(porc_response_open_socks_content)) != 0)
+				{
+					fprintf (stderr, "Error sending ack for socks session opening(router)\n");
+					return -1;
+				}
+
+				printf ("Ack sent for open socks\n");
+				
+				
+				
+				
 
 			} else if (porc_payload_header->code == PORC_COMMAND_ASK_KEY) {
 
@@ -804,6 +820,7 @@ int process_porc_packet(int tls_session_id) {
 ////////////////////////////////////////////////////////////////////////////////////////
 int send_to_porc(int socks_session_id) {
 	// Get the current socks session
+	printf("entering sendtoporc\n");
 	ITEM_SOCKS_SESSION * socks_session;
 	if (ChainedListFind (&socks_session_list, socks_session_id, (void **) &socks_session)!=0)
 	{
@@ -828,12 +845,14 @@ int send_to_porc(int socks_session_id) {
 	memcpy(out_buffer,payload_header,sizeof(PORC_CONTENT_RETURN));
 	memcpy(out_buffer+sizeof(PORC_CONTENT_RETURN),in_buffer,in_buffer_len);	
 	//Push it to the TOR stream
+	printf("attemp to send socks packet to porc\n");
 	if (relay_porc_send (PORC_RESPONSE_TRANSMIT, socks_session->client_porc_session, 
 	out_buffer, out_buffer_len)!=0)
 	{
 		fprintf(stderr,"Error pushing SOCKS stream to TOR (tunnel end) : send_to_porc\n");
 		return -1;
 	}
+	printf("packet sent\n");
 	free(out_buffer);
 	free(in_buffer);
 	return 0;

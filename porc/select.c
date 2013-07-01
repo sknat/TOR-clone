@@ -4,17 +4,28 @@
 //		Send a packet to the first known relay of the tunnel
 //		Just give in a text buffer to send, its length and the session_id
 ////////////////////////////////////////////////////////////////////////////////////////
-int send_to_relay(char *buffer, int buffer_len, int porc_session_id) {
-	
-	
-	
+int send_to_relay(char *buffer, int buffer_len, int item_client_id) 
+	{
+	//Generate appropriate header
+	PORC_CONTENT_TRANSMIT * payload_header = malloc(sizeof(PORC_CONTENT_TRANSMIT));
+	payload_header->socks_session_id = item_client_id;
+	char * out_buffer = malloc(sizeof(PORC_CONTENT_TRANSMIT)+buffer_len);
+	memcpy(out_buffer,payload_header,sizeof(PORC_CONTENT_TRANSMIT));
+	memcpy(out_buffer+sizeof(PORC_CONTENT_TRANSMIT),buffer,buffer_len);	
+	//Send it
+	if (client_porc_send (PORC_COMMAND_TRANSMIT, out_buffer, sizeof(PORC_CONTENT_TRANSMIT)+buffer_len)!=0)
+	{
+		fprintf(stderr,"Error sending buffer to the first Porc relay (client)\n");
+		return -1;
+	}
+	free(payload_header);
 	return 0;
 }
 
 
 int set_fds (int *nfds, fd_set *fds) {
 	CHAINED_LIST_LINK *c;
-	int max = -2;
+	int max = client_circuit.relay1_socket_descriptor;
 	int n = 1;
 
 	FD_ZERO (fds);
@@ -26,22 +37,126 @@ int set_fds (int *nfds, fd_set *fds) {
 			max = ((ITEM_CLIENT*)(c->item))->client_socket_descriptor;
 		}
 	}
+	printf ("set_fds returns %i\n", n);
 
 	*nfds = max + 1;
 	return n;	
 }
 
+int client_process_porc_packet()
+{
+	PORC_RESPONSE porc_response;
+	char * payload;
+	size_t payload_length;
+	if (client_porc_recv (&porc_response, &payload, &payload_length)!=0)
+	{
+		fprintf (stderr, "Stop (40)\n");
+		return -1;
+	}
+	if (porc_response == PORC_RESPONSE_OPEN_SOCKS)
+	{
+		PORC_RESPONSE_OPEN_SOCKS_CONTENT *porc_response_open_socks_content;
 
-/*
-	do_proxy - Process existing PORC client connections.
+		porc_response_open_socks_content = (PORC_RESPONSE_OPEN_SOCKS_CONTENT*) payload; 
+		if (porc_response_open_socks_content->status != PORC_STATUS_SUCCESS) 
+		{
+			fprintf (stderr,"Impossible to join target\n");
+			return 0;
+		}
+		printf("Target joined\n");
+		if (ChainedListComplete (&socks_session_list, porc_response_open_socks_content->socks_session_id)!=0) 
+		{
+			fprintf (stderr,"Wrong socks session id\n");
+			return 0;
+		}
+		printf("Correct socks session id\n");
+		ITEM_CLIENT * client;
+		if (ChainedListFind (&socks_session_list, porc_response_open_socks_content->socks_session_id, (void**) &client)!=0)
+		{
+			fprintf (stderr,"Socks session id not found\n");
+			return 0;
+		}
+		SOCKS4Response socks_response;
+		socks_response.null_byte=0;
+		socks_response.status=RESP_SUCCEDED;
+		socks_response.rsv1=0;
+		socks_response.rsv2=0;
+		printf("client socket descr : %i\n",client->client_socket_descriptor);
+		if (send(client->client_socket_descriptor, (const char*)&socks_response, sizeof(SOCKS4Response), 0)
+			!= sizeof(SOCKS4Response)) 
+		{
+			fprintf (stderr, "Error in socks_response\n");
+			return -1;
+		}
+		ChainedListComplete(&socks_session_list, porc_response_open_socks_content->socks_session_id);
+		printf("SIGUSR1\n");
+		// Signaling a new available socket to the selecting thread
+		if (pthread_kill (selecting_thread, SIGUSR1) != 0) {
+			fprintf (stderr, "Signal sending failed\n");
+			return -1;
+		}	
+		printf("SIGUSR1 done\n");
+	}
+	else if (porc_response == PORC_RESPONSE_TRANSMIT)
+	{
+		ITEM_CLIENT * client;
+		PORC_CONTENT_RETURN * porc_content_return = (PORC_CONTENT_RETURN*) payload;
+		if (ChainedListFind (&socks_session_list, porc_content_return->socks_session_id, (void**) &client)!=0)
+		{
+			fprintf (stderr,"Socks session id not found\n");
+			return 0;
+		}
+		printf ("Receiving from relay (%d bytes) : %s\n", payload_length, payload);
+		size_t message_length = payload_length - sizeof(PORC_CONTENT_RETURN);
+		char * message = payload+sizeof(PORC_CONTENT_RETURN);
+		if (send(client->client_socket_descriptor, message, message_length, 0)
+			!= message_length) 
+		{
+			fprintf (stderr, "Error in socks_response (100)\n");
+			return -1;
+		}
+	}
+	free(payload);
+	return 0;
+}
 
-	Do proxy between a clear connections and a secure connection.
-*/
+int client_process_socks_packet(int client_id)
+{
+	char buffer[SOCKS_BUFFER_SIZE+1];
+	ITEM_CLIENT * client;
+	if (ChainedListFind (&socks_session_list, client_id, (void **)&client)!=0)
+	{
+		fprintf (stderr, "Stop (80)\n");
+		return -1;
+	}
+
+	printf("Received a message from a SOCKS client\n");
+	int recvd = recv(client->client_socket_descriptor, buffer, SOCKS_BUFFER_SIZE, 0);
+	if(recvd <= 0) 
+	{
+		fprintf (stderr, "Stop (100), %d\n", client_id);
+		return -1;
+	}
+	buffer [recvd] = '\0';
+	printf ("Receiving from client (%d bytes) : %s\n", recvd, buffer);
+	if (send_to_relay(buffer, recvd, client_id)!=0) 
+	{
+		fprintf (stderr, "Stop (250), %d\n", client_id);
+		return -1;
+	}
+	return 0;
+}
+
+////////////////////////////////////////////////////////////////////////
+//		do_proxy - Process existing PORC client connections.
+//
+// 	Do proxy between a clear connections and a secure connection.
+////////////////////////////////////////////////////////////////////////
 int do_proxy() {
+	printf("starting socks proxy...\n");
 	fd_set read_fds;
 	int ret, nbr;
 	int nfds;
-	char buffer[SOCKS_BUFFER_SIZE+1];
 	CHAINED_LIST_LINK *c;
 	sigset_t signal_set_tmp, signal_set;
 
@@ -57,45 +172,33 @@ int do_proxy() {
 		return -1;
 	}
 
+	printf("Entering thread loop\n");
 	for (;;) {
+		printf ("About to set fds\n");
 		if (set_fds (&nfds, &read_fds) == -1) {
 			fprintf (stderr, "Preventing a dead-lock.\n");
 			return -1;
 		}
+		printf ("fds set\n");
 
-		while((nbr = pselect(nfds, &read_fds, 0, 0, 0, &signal_set)) > 0) {
-			if (FD_ISSET (client_circuit.relay1_socket_descriptor, &read_fds)) {
-				int recvd = gnutls_record_recv(client_circuit.relay1_gnutls_session, buffer, SOCKS_BUFFER_SIZE);
-				if(recvd <= 0) {
-					fprintf (stderr, "Stop (50) on relay reception\n");
-					return -1;
-				}
-				buffer [recvd] = '\0';
-				printf ("Receiving from relay (%d bytes) : %s\n", recvd, buffer);
-				if (send_to_relay(buffer, recvd, c->id)!=0) {
-					fprintf (stderr, "Stop (70), %d\n", c->id);
-					return -1;
-				}
+		if((nbr = pselect(nfds, &read_fds, 0, 0, 0, &signal_set)) > 0) {
+			printf("pselect returned %i\n",nbr);
+			if (FD_ISSET (client_circuit.relay1_socket_descriptor, &read_fds)) 
+			{
+				printf("Received a message from PORC network\n");
+				client_process_porc_packet();
 			}
-			for (c=socks_session_list.first; c!=NULL; c=c->nxt) {
-				if (FD_ISSET (((ITEM_CLIENT*)(c->item))->client_socket_descriptor, &read_fds)) {
-					int recvd = recv(((ITEM_CLIENT*)(c->item))->client_socket_descriptor, buffer, SOCKS_BUFFER_SIZE, 0);
-					if(recvd <= 0) {
-						fprintf (stderr, "Stop (100), %d\n", c->id);
-						return -1;
-					}
-					buffer [recvd] = '\0';
-					printf ("Receiving from client (%d bytes) : %s\n", recvd, buffer);
-					if (send_to_relay(buffer, recvd, c->id)!=0) {
-						fprintf (stderr, "Stop (250), %d\n", c->id);
-						return -1;
-					}
+			for (c=socks_session_list.first; c!=NULL; c=c->nxt) 
+			{
+				if (FD_ISSET (((ITEM_CLIENT*)(c->item))->client_socket_descriptor, &read_fds)) 
+				{
+					client_process_socks_packet(c->id);
 				}
 			}
 		}
+		printf("pselect returned negative %i\n",nbr);
 	}
 
 	return 0;
 }
-
 

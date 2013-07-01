@@ -11,7 +11,7 @@
 #define FILE_LIST_RELAYS	"./listrelays"
 #define PATH_LIST_RELAYS	"./directory/listrelays"
 
-#define CLIENT_PORT	5555
+#define CLIENT_PORT	5558
 #define CLIENT_IP	"127.0.0.1"
 
 #define DIRECTORY_PORT	5556
@@ -27,7 +27,7 @@
 #define PORC_MAX_PAYLOAD_LENGTH		1024
 #define PORC_MAX_PACKET_LENGTH		1024
 
-#define MAX_CIRCUIT_LENGTH 5
+#define MAX_CIRCUIT_LENGTH 10
 
 
 #define CRYPTO_CIPHER		GCRY_CIPHER_AES256
