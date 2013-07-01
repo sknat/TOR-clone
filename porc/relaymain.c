@@ -831,10 +831,18 @@ int send_to_porc(int socks_session_id) {
 	char * in_buffer = malloc(in_buffer_len);
 	//Read the socks stream
 	in_buffer_len = recv(socks_session->target_socket_descriptor, in_buffer, in_buffer_len, 0);
-	if (in_buffer_len<=0)
+	if (in_buffer_len<0)
 	{
 		fprintf(stderr,"Error reading socks packet %i : send_to_porc\n",in_buffer_len);
 		return -1;
+	}
+	// If we get a closing signal
+	if (in_buffer_len==0)
+	{
+			printf("closed stream\n");
+			ChainedListRemove(&socks_session_list,socks_session_id);
+			close(socks_session->target_socket_descriptor);
+			return 0;
 	}
 	//Process it to add it to header information
 	int out_buffer_len = in_buffer_len+sizeof(PORC_CONTENT_RETURN);
