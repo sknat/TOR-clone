@@ -731,9 +731,6 @@ int process_porc_packet(int tls_session_id) {
 				return -1;
 			}
 		}
-
-		free (payload);
-		return 0;
 	} else if (porc_packet_header.direction == PORC_DIRECTION_UP) {
 		// We must encode
 		printf ("direction is UP\n");
@@ -755,18 +752,50 @@ int process_porc_packet(int tls_session_id) {
 			fprintf (stderr, "PORC session not found\n");
 			return -1;
 		}
-// encode and send
-		free (payload);
-		return 0;
+
+		if (porc_session->server_tls_session != tls_session_id)
+		{
+			fprintf (stderr, "Wrong tls session (direction is DOWN)\n");
+			return -1;
+		}
+		printf ("first bytes of the encrypted payload : %08x\n", *(int *)payload);
+		if (gcry_cipher_encrypt (porc_session->gcry_cipher_hd, payload, payload_length, NULL, 0)) {
+			fprintf (stderr, "gcry_cipher_decrypt failed\n");
+			return -1;
+		}
+		printf ("first bytes of the encrypted payload : %08x\n", *(int *)payload);
+
+		//Rewrite paquet
+		printf ("Rewrite packet\n");
+		porc_packet_header.porc_session_id = porc_session_id;
+
+		// Find TLS session
+		ITEM_TLS_SESSION *previous_tls_session;
+		ChainedListFind (&tls_session_list, porc_session->client_tls_session, (void **)&previous_tls_session);
+
+		if (gnutls_record_send (previous_tls_session->gnutls_session, (char *)&porc_packet_header, sizeof(porc_packet_header)) 
+			!= sizeof(porc_packet_header))
+		{
+			fprintf (stderr, "Error forwarding header to next relay (router)\n");
+			return -1;
+		}
+		if (gnutls_record_send (previous_tls_session->gnutls_session, payload, payload_length) 
+			!= payload_length)
+		{
+			fprintf (stderr, "Error forwarding payload to next relay (router)\n");
+			return -1;
+		}
+		printf ("Packet encoded and sent\n");
 	}
 	else 
 	{
 		fprintf (stderr, "Incorrect direction\n");
+		free (payload);
 		return -1;
 	}
 
-	fprintf (stderr, "Incorrect PORC session.\n");
-	return -1;
+	free (payload);
+	return 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////

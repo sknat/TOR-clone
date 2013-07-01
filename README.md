@@ -18,3 +18,4 @@ TODO :
 * mettre des timeout dans les champs dont complete=0
 * vérifier les allocations mémoires
 * send PORC_STATUS_FAILURE when failures occurs
+* conversion représentation sym key : bug quand trop petit
