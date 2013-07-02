@@ -8,6 +8,13 @@
 
 #include "select.h"
 
+
+// ################################################################################
+//
+//							PROCESSING CONNECTIONS
+//
+// ################################################################################
+
 int set_fds (int *nfds, fd_set *fds) {
 	CHAINED_LIST_LINK *c;
 	int max = -2;
@@ -537,6 +544,10 @@ int process_porc_packet(int tls_session_id) {
 	return 0;
 }
 
+
+
+
+
 ////////////////////////////////////////////////////////////////////////////////////////
 // Gets packets from the socks session at the end of the tunnel and push them into the
 // tunnel toward the client
@@ -564,6 +575,18 @@ int send_to_porc(int socks_session_id) {
 	{
 			printf("closed stream\n");
 			ChainedListRemove(&socks_session_list,socks_session_id);
+
+			// Close the SOCKS_CONNECTION
+			PORC_RESPONSE_CLOSE_SOCKS_CONTENT porc_response_colse_socks_content;
+			porc_response_colse_socks_content.socks_session_id = socks_session_id;
+			if (relay_porc_send (PORC_RESPONSE_CLOSE_SOCKS, socks_session->client_porc_session, 
+				(char *)&porc_response_colse_socks_content, sizeof(porc_response_colse_socks_content))!=0)
+			{
+				fprintf(stderr,"Error signaling SOCKS connection end to TOR (tunnel end) : send_to_porc\n");
+				return -1;
+			}
+			printf("SOCKS connection closed\n");
+			
 			close(socks_session->target_socket_descriptor);
 			return 0;
 	}
@@ -578,7 +601,7 @@ int send_to_porc(int socks_session_id) {
 	//Push it to the TOR stream
 	printf("attemp to send socks packet to porc\n");
 	if (relay_porc_send (PORC_RESPONSE_TRANSMIT, socks_session->client_porc_session, 
-	out_buffer, out_buffer_len)!=0)
+		out_buffer, out_buffer_len)!=0)
 	{
 		fprintf(stderr,"Error pushing SOCKS stream to TOR (tunnel end) : send_to_porc\n");
 		return -1;
@@ -641,3 +664,5 @@ int selecting() {
 
 	return 0;
 }
+
+

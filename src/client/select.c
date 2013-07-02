@@ -122,6 +122,19 @@ int client_process_porc_packet()
 			return -1;
 		}
 	}
+	else if (porc_response == PORC_RESPONSE_CLOSE_SOCKS)
+	{
+		ITEM_CLIENT * client;
+		PORC_RESPONSE_CLOSE_SOCKS_CONTENT * porc_response_socks_content = (PORC_RESPONSE_CLOSE_SOCKS_CONTENT*) payload;
+		if (ChainedListFind (&socks_session_list, porc_response_socks_content->socks_session_id, (void**) &client)!=0)
+		{
+			fprintf (stderr,"Socks session id not found\n");
+			return 0;
+		}
+		printf ("SOCKS connection is closed by target\n");
+		close (client->client_socket_descriptor);
+		ChainedListRemove (&socks_session_list, porc_response_socks_content->socks_session_id);
+	}
 	free(payload);
 	return 0;
 }
@@ -138,10 +151,16 @@ int client_process_socks_packet(int client_id)
 
 	printf("Received a message from a SOCKS client\n");
 	int recvd = recv(client->client_socket_descriptor, buffer, SOCKS_BUFFER_SIZE, 0);
-	if(recvd <= 0) 
+	if(recvd < 0) 
 	{
 		fprintf (stderr, "Stop (100), %d\n", client_id);
 		return -1;
+	}
+	if(recvd == 0) 
+	{
+		printf ("SOCKS Client stoped connection, %d\n", client_id);
+		ChainedListRemove (&socks_session_list, client_id);
+		return 0;
 	}
 	buffer [recvd] = '\0';
 	printf ("Receiving from client (%d bytes) : %s\n", recvd, buffer);
