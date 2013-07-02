@@ -19,3 +19,7 @@ TODO :
 * vérifier les allocations mémoires
 * send PORC_STATUS_FAILURE when failures occurs
 * conversion représentation sym key : bug quand trop petit
+* Revoir l'écriture du fichier listrelays (permissions en écriture)
+
+* Close PORC & SOCKS
+* Client : ne faire ecouter la thread accepting que sur le socket d'ecoute (ajouter à client_process_porc_packet ces commandes)

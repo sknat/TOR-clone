@@ -16,6 +16,7 @@ save/*
 *.exe
 *.o
 *.so
+*.bin
 tsocks
 
 # Packages #
@@ -36,6 +37,7 @@ tsocks
 *.log
 *.sql
 *.sqlite
+*.stackdump
 
 # OS generated files #
 ######################
