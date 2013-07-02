@@ -18,6 +18,7 @@
 #include <time.h>
 #include <signal.h>
 #include <sys/types.h>
+#include <errno.h>
 
 #include <sys/socket.h>
 #include <netinet/in.h>

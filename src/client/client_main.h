@@ -20,6 +20,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <gcrypt.h>
+#include <errno.h>
 
 #include "../lib/tcp.h"
 #include "../lib/tls.h"
@@ -41,6 +42,7 @@ typedef struct CLIENT_CIRCUIT {
 	gnutls_session_t relay1_gnutls_session;
 	int relay1_socket_descriptor;
 	gcry_cipher_hd_t gcry_cipher_hd[MAX_CIRCUIT_LENGTH];
+	int initvect_index[MAX_CIRCUIT_LENGTH];
 	int length;
 }	CLIENT_CIRCUIT;
 

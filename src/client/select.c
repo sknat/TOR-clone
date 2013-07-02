@@ -80,12 +80,12 @@ int client_process_porc_packet()
 		if (porc_response_open_socks_content->status != PORC_STATUS_SUCCESS) 
 		{
 			printf ("Impossible to join target\n");
-			socks_response.status=RESP_SUCCEDED;
+			socks_response.status=RESP_ERROR;
 			ChainedListRemove (&socks_session_list, porc_response_open_socks_content->socks_session_id);
 			return 0;
 		} else {
 			printf("Target joined\n");
-			socks_response.status=RESP_ERROR;
+			socks_response.status=RESP_SUCCEDED;
 			ChainedListComplete(&socks_session_list, porc_response_open_socks_content->socks_session_id);
 		}
 
@@ -224,7 +224,17 @@ int do_proxy() {
 				}
 			}
 		}
-		printf("pselect returned negative %i\n",nbr);
+		if (nbr == 0) {
+			printf ("nbr = 0 (timeout?)\n");;
+			return -1;
+		} else if (nbr == -1) {
+			if (errno == EINTR) {
+				printf ("pselect() was interrupted\n");
+			} else {
+				printf ("pselect() returned with error %d\n", errno);
+				return -1;
+			}
+		}
 	}
 
 	return 0;

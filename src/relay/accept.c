@@ -193,6 +193,7 @@ int handle_connection(int client_socket_descriptor) {
 		fprintf (stderr, "gcry_cipher_setiv failed\n");
 		return -1;
 	}
+	gcry_cipher_reset (gcry_cipher_hd);
 
 	free (key_plain);
 
@@ -211,6 +212,7 @@ int handle_connection(int client_socket_descriptor) {
 	porc_session->id_prev = porc_handshake_new.porc_session_id;
 	porc_session->client_tls_session = tls_session_id;
 	porc_session->gcry_cipher_hd = gcry_cipher_hd;
+	porc_session->initvect_index = 0;
 	porc_session->final = 1;
 	porc_session->server_tls_session = 0;
 

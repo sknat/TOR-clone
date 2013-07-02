@@ -40,6 +40,7 @@ typedef struct
 	int id_prev;			// PORC client's id for the PORC session
 	int client_tls_session;
 	gcry_cipher_hd_t gcry_cipher_hd;
+	int initvect_index;
 	int final;			// set if the relay is the final relay (then server_tls_session undefined)
 	int server_tls_session;
 } 	ITEM_PORC_SESSION;

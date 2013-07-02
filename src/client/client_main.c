@@ -17,10 +17,22 @@ MYSOCKET *list_relays = NULL;
 int client_porc_recv (PORC_RESPONSE *porc_response, char **payload, size_t *payload_length)
 {
 	PORC_PACKET_HEADER porc_packet_header;
-	if (gnutls_record_recv (client_circuit.relay1_gnutls_session, (char*)&porc_packet_header , sizeof(porc_packet_header))
-		!= sizeof(porc_packet_header))
+	int ret;
+
+	ret = gnutls_record_recv (client_circuit.relay1_gnutls_session, (char*)&porc_packet_header , sizeof(porc_packet_header));
+	if (ret == 0) {
+		fprintf (stderr, "Connection from PORC network closed unexpectedly\n");
+		close(client_circuit.relay1_socket_descriptor);
+		return -1;
+	}
+	if (ret < 0) {
+		fprintf (stderr, "Failed to receive the header of the packet in client_porc_recv (1)\n");
+		close(client_circuit.relay1_socket_descriptor);
+		return -1;
+	}
+	if (ret != sizeof(porc_packet_header))
 	{
-		fprintf (stderr, "Failed to receive the header of the packet in client_porc_recv\n");
+		fprintf (stderr, "Failed to receive the header of the packet in client_porc_recv (2)\n");
 		return -1;
 	}
 	if (porc_packet_header.length > PORC_MAX_PACKET_LENGTH) {
@@ -52,12 +64,15 @@ int client_porc_recv (PORC_RESPONSE *porc_response, char **payload, size_t *payl
 	int i;
 	for (i=0 ; i<client_circuit.length; i++)
 	{
+		printf ("initvect_index = %d\n", client_circuit.initvect_index[i]);
+		client_circuit.initvect_index[i]++;
 		if (gcry_cipher_decrypt(client_circuit.gcry_cipher_hd[i], porc_payload,
 			porc_payload_length, NULL, 0))
 		{
 			fprintf (stderr, "gcry_cipher_decrypt failed\n");
 			return -1;
 		}
+		gcry_cipher_reset (client_circuit.gcry_cipher_hd[i]);
 	}
 
 	PORC_PAYLOAD_HEADER *porc_payload_header = (PORC_PAYLOAD_HEADER *)porc_payload;
@@ -110,10 +125,13 @@ int client_porc_send (PORC_COMMAND command, char *payload, size_t payload_length
 	int i;
 	for (i=client_circuit.length-1; i>=0; i--) {
 		printf ("first bytes of the encrypted payload (i=%i) : %08x\n", i, *(int *)payload_in_packet);
+		printf ("initvect index : %d\n", client_circuit.initvect_index[i]);
+		client_circuit.initvect_index[i]++;
 		if (gcry_cipher_encrypt(client_circuit.gcry_cipher_hd[i], payload_in_packet, crypted_payload_length, NULL, 0)) {
 			fprintf (stderr, "gcry_cipher_encrypt failed\n");
 			return -1;
 		}
+		gcry_cipher_reset (client_circuit.gcry_cipher_hd[i]);
 	}
 	printf ("first bytes of the encrypted payload (i=%i) : %08x\n", i, *(int *)payload_in_packet);
 
@@ -157,6 +175,8 @@ int set_symmetric_key (char **key_crypted, int *key_crypted_length, char *public
 		fprintf (stderr, "gcry_cipher_setiv failed\n");
 		return -1;
 	}
+	gcry_cipher_reset (client_circuit.gcry_cipher_hd[relay_index]);
+	client_circuit.initvect_index[relay_index]=0;
 
 	printf ("first bytes of sym key : %d, %d, %d, %d\n", symmetric_key[0], symmetric_key[1], symmetric_key[2], symmetric_key[3]);
 
@@ -520,7 +540,6 @@ int client_circuit_init (int circuit_length)
 			fprintf (stderr, "Error while contacting relay[%i]\n",relay_id);
 			return -1;
 		}
-
 		printf ("--------------New relay %i---------\n", client_circuit.length);
 		client_circuit.length++;
 		//Tunnel is now open to router[router_index]

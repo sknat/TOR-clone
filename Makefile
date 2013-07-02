@@ -1,16 +1,15 @@
-
-
 BINS	  =	relay/relay_main.bin 							\
-			client/client_main.bin 							\
-			socks_sample_client/socks_sample_client.bin 	\
-			directory/directory.bin 						\
-			set_dir_utility/set_dir_utility.bin
-			
+		client/client_main.bin 							\
+		socks_sample_client/socks_sample_client.bin 				\
+		directory/directory.bin 						\
+		set_dir_utility/set_dir_utility.bin
+
 CC        = gcc
 CFLAGS	= -O0 -Wall $(INCLUDE) `pkg-config gnutls --cflags` `libgcrypt-config --cflags`
 LIBS	= `pkg-config gnutls --libs` `libgcrypt-config --libs`
 DIRS := ${shell find src/ -type d -print}
 SRC       = $(foreach dir,$(DIRS),$(wildcard $(dir)/*.c))
+SAVE       = $(foreach dir,$(DIRS),$(wildcard $(dir)/*~))
 OBJ       = $(patsubst src/%.c,build/%.o,$(SRC))
 RBINS 	  =	$(foreach bin,$(BINS),build/$(bin))
 	
@@ -56,5 +55,4 @@ mkdir:
 	mkdir -p $(patsubst src/%,build/%,$(DIRS))
 	
 clean:
-	rm -f $(RBINS) $(OBJ) 
-
+	rm -f $(RBINS) $(OBJ) $(SAVE)

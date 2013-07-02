@@ -82,11 +82,14 @@ int relay_porc_send (int code, int porc_session_id, char *payload, size_t payloa
 		fprintf (stderr, "Impossible to find the tls session\n");
 		return -1;
 	}
-
+	printf ("initvect_index = %d\n", porc_session->initvect_index);
+	porc_session->initvect_index++;
 	if (gcry_cipher_encrypt (porc_session->gcry_cipher_hd, payload_in_packet, crypted_payload_length, NULL, 0)) {
 		fprintf (stderr, "gcry_cipher_encrypt failed\n");
 		return -1;
 	}
+	gcry_cipher_reset (porc_session->gcry_cipher_hd);
+
 
 	if (gnutls_record_send (tls_session->gnutls_session, porc_packet, porc_packet_length) != porc_packet_length)
 	{
@@ -189,11 +192,15 @@ int process_porc_packet(int tls_session_id) {
 			fprintf (stderr, "Wrong tls session\n");
 			return -1;
 		}
+		printf ("initvect_index = %d\n", porc_session->initvect_index);
+		porc_session->initvect_index++;
 		printf ("first bytes of the encrypted payload : %08x\n", *(int *)payload);
 		if (gcry_cipher_decrypt (porc_session->gcry_cipher_hd, payload, payload_length, NULL, 0)) {
 			fprintf (stderr, "gcry_cipher_decrypt failed\n");
 			return -1;
 		}
+		gcry_cipher_reset (porc_session->gcry_cipher_hd);
+
 		printf ("first bytes of the encrypted payload : %08x\n", *(int *)payload);
 		if (porc_session->final == 0) 
 		{
@@ -286,7 +293,7 @@ int process_porc_packet(int tls_session_id) {
 				}
 
 				// Send acknowledgment back to client
-				if (relay_porc_send (PORC_RESPONSE_OPEN_SOCKS, porc_command_open_socks_content->socks_session_id,
+				if (relay_porc_send (PORC_RESPONSE_OPEN_SOCKS, porc_session_id,
 					(char *)&porc_response_open_socks_content,
 					sizeof(porc_response_open_socks_content)) != 0)
 				{
@@ -519,10 +526,13 @@ int process_porc_packet(int tls_session_id) {
 			return -1;
 		}
 		printf ("first bytes of the encrypted payload : %08x\n", *(int *)payload);
+		printf ("initvect_index = %d\n", porc_session->initvect_index);
+		porc_session->initvect_index++;
 		if (gcry_cipher_encrypt (porc_session->gcry_cipher_hd, payload, payload_length, NULL, 0)) {
 			fprintf (stderr, "gcry_cipher_decrypt failed\n");
 			return -1;
 		}
+		gcry_cipher_reset (porc_session->gcry_cipher_hd);
 		printf ("first bytes of the encrypted payload : %08x\n", *(int *)payload);
 
 		//Rewrite paquet
@@ -602,6 +612,7 @@ int send_to_porc(int socks_session_id) {
 			printf("SOCKS connection closed\n");
 			
 			close(socks_session->target_socket_descriptor);
+			ChainedListRemove (&socks_session_list, socks_session_id);
 			return 0;
 	}
 	//Process it to add it to header information
@@ -672,6 +683,17 @@ int selecting() {
 						return -1;
 					}
 				}
+			}
+		}
+		if (nbr == 0) {
+			printf ("nbr = 0 (timeout?)\n");;
+			return -1;
+		} else if (nbr == -1) {
+			if (errno == EINTR) {
+				printf ("pselect() was interrupted\n");
+			} else {
+				printf ("pselect() returned with error %d\n", errno);
+				return -1;
 			}
 		}
 	}
