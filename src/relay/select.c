@@ -42,6 +42,8 @@ int set_fds (int *nfds, fd_set *fds) {
 		}
 	}
 	*nfds = max + 1;
+
+	printf ("set_dfs returns %i\n", n);
 	return n;	
 }
 
@@ -124,13 +126,18 @@ int process_porc_packet(int tls_session_id) {
 		close (tls_session->socket_descriptor);
 		ChainedListRemove (&tls_session_list, tls_session_id);
 		return -1;
+	} else if (ret == GNUTLS_E_PREMATURE_TERMINATION) {
+		fprintf (stderr, "Connection closed unexpectedly from PORC network (2)\n");
+		close (tls_session->socket_descriptor);
+		ChainedListRemove (&tls_session_list, tls_session_id);
+		return -1;
 	} else if (ret < 0) {
-		fprintf (stderr, "Error receiving message from PORC network\n");
+		fprintf (stderr, "Error receiving message from PORC network : %d\n", ret);
 		close (tls_session->socket_descriptor);
 		ChainedListRemove (&tls_session_list, tls_session_id);
 		return -1;
 	} else if (ret < sizeof (porc_packet_header)) {
-		fprintf (stderr, "Not enough to read (packet header)\n");
+		fprintf (stderr, "Not enough to read (packet header) : %i instead of %i\n", ret, sizeof (porc_packet_header));
 		close (tls_session->socket_descriptor);
 		ChainedListRemove (&tls_session_list, tls_session_id);
 		return -1;
