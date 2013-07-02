@@ -61,40 +61,41 @@ int client_process_porc_packet()
 	}
 	if (porc_response == PORC_RESPONSE_OPEN_SOCKS)
 	{
-		PORC_RESPONSE_OPEN_SOCKS_CONTENT *porc_response_open_socks_content;
-
-		porc_response_open_socks_content = (PORC_RESPONSE_OPEN_SOCKS_CONTENT*) payload; 
-		if (porc_response_open_socks_content->status != PORC_STATUS_SUCCESS) 
-		{
-			fprintf (stderr,"Impossible to join target\n");
-			return 0;
-		}
-		printf("Target joined\n");
-		if (ChainedListComplete (&socks_session_list, porc_response_open_socks_content->socks_session_id)!=0) 
-		{
-			fprintf (stderr,"Wrong socks session id\n");
-			return 0;
-		}
-		printf("Correct socks session id\n");
+		printf ("Received PORC_RESPONSE_OPEN_SOCKS\n");
+		PORC_RESPONSE_OPEN_SOCKS_CONTENT *porc_response_open_socks_content
+			= (PORC_RESPONSE_OPEN_SOCKS_CONTENT*) payload; 
 		ITEM_CLIENT * client;
 		if (ChainedListFind (&socks_session_list, porc_response_open_socks_content->socks_session_id, (void**) &client)!=0)
 		{
 			fprintf (stderr,"Socks session id not found\n");
 			return 0;
 		}
+		printf("client socket descr : %i\n",client->client_socket_descriptor);
+
 		SOCKS4Response socks_response;
 		socks_response.null_byte=0;
-		socks_response.status=RESP_SUCCEDED;
 		socks_response.rsv1=0;
 		socks_response.rsv2=0;
-		printf("client socket descr : %i\n",client->client_socket_descriptor);
+
+		if (porc_response_open_socks_content->status != PORC_STATUS_SUCCESS) 
+		{
+			printf ("Impossible to join target\n");
+			socks_response.status=RESP_SUCCEDED;
+			ChainedListRemove (&socks_session_list, porc_response_open_socks_content->socks_session_id);
+			return 0;
+		} else {
+			printf("Target joined\n");
+			socks_response.status=RESP_ERROR;
+			ChainedListComplete(&socks_session_list, porc_response_open_socks_content->socks_session_id);
+		}
+
 		if (send(client->client_socket_descriptor, (const char*)&socks_response, sizeof(SOCKS4Response), 0)
 			!= sizeof(SOCKS4Response)) 
 		{
 			fprintf (stderr, "Error in socks_response\n");
 			return -1;
 		}
-		ChainedListComplete(&socks_session_list, porc_response_open_socks_content->socks_session_id);
+
 		printf("SIGUSR1\n");
 		// Signaling a new available socket to the selecting thread
 		if (pthread_kill (selecting_thread, SIGUSR1) != 0) {
@@ -105,6 +106,7 @@ int client_process_porc_packet()
 	}
 	else if (porc_response == PORC_RESPONSE_TRANSMIT)
 	{
+		printf ("Received PORC_RESPONSE_TRANSMIT\n");
 		ITEM_CLIENT * client;
 		PORC_CONTENT_RETURN * porc_content_return = (PORC_CONTENT_RETURN*) payload;
 		if (ChainedListFind (&socks_session_list, porc_content_return->socks_session_id, (void**) &client)!=0)
@@ -124,6 +126,7 @@ int client_process_porc_packet()
 	}
 	else if (porc_response == PORC_RESPONSE_CLOSE_SOCKS)
 	{
+		printf ("Received PORC_RESPONSE_CLOSE_SOCKS\n");
 		ITEM_CLIENT * client;
 		PORC_RESPONSE_CLOSE_SOCKS_CONTENT * porc_response_socks_content = (PORC_RESPONSE_CLOSE_SOCKS_CONTENT*) payload;
 		if (ChainedListFind (&socks_session_list, porc_response_socks_content->socks_session_id, (void**) &client)!=0)

@@ -105,6 +105,7 @@ int relay_porc_send (int code, int porc_session_id, char *payload, size_t payloa
 int process_porc_packet(int tls_session_id) {
 	ITEM_TLS_SESSION *tls_session;
 	gnutls_session_t gnutls_session;
+	int ret;
 	
 	ChainedListFind (&tls_session_list, tls_session_id, (void**)&tls_session);
 	gnutls_session = tls_session->gnutls_session;
@@ -114,10 +115,21 @@ int process_porc_packet(int tls_session_id) {
 
 	// Read the header : length, direction, porc_session_id
 	PORC_PACKET_HEADER porc_packet_header;
-	if (gnutls_record_recv (gnutls_session, (char *)&porc_packet_header, sizeof(porc_packet_header))
-		!= sizeof (porc_packet_header))
-	{
-		fprintf (stderr, "Impossible to read the header of the PORC packet\n");
+	ret = gnutls_record_recv (gnutls_session, (char *)&porc_packet_header, sizeof(porc_packet_header));
+	if (ret == 0) {
+		fprintf (stderr, "Connection closed unexpectedly from PORC network\n");
+		close (tls_session->socket_descriptor);
+		ChainedListRemove (&tls_session_list, tls_session_id);
+		return -1;
+	} else if (ret < 0) {
+		fprintf (stderr, "Error receiving message from PORC network\n");
+		close (tls_session->socket_descriptor);
+		ChainedListRemove (&tls_session_list, tls_session_id);
+		return -1;
+	} else if (ret < sizeof (porc_packet_header)) {
+		fprintf (stderr, "Not enough to read (packet header)\n");
+		close (tls_session->socket_descriptor);
+		ChainedListRemove (&tls_session_list, tls_session_id);
 		return -1;
 	}
 
@@ -248,28 +260,34 @@ int process_porc_packet(int tls_session_id) {
 				PORC_COMMAND_OPEN_SOCKS_CONTENT *porc_command_open_socks_content =
 					(PORC_COMMAND_OPEN_SOCKS_CONTENT *)payload_content;
 
+				PORC_RESPONSE_OPEN_SOCKS_CONTENT porc_response_open_socks_content;
+				porc_response_open_socks_content.socks_session_id = porc_command_open_socks_content->socks_session_id;
+
 				int target_socket_descriptor = connect_to_host (
 					htonl(porc_command_open_socks_content->ip),
 					htons(porc_command_open_socks_content->port));
 				if (target_socket_descriptor < 0)
 				{
-					fprintf (stderr, "Error connecting to host - socks - (final node)\n");
-					return -1;
+					printf ("Impossible to connect to host - socks - (final node)\n");
+
+					porc_response_open_socks_content.status = PORC_STATUS_FAILURE;
+				} else {
+					printf("Connection to host established\n");
+					porc_response_open_socks_content.status = PORC_STATUS_SUCCESS;
+
+					// Recode the socks session
+					ITEM_SOCKS_SESSION *socks_session;
+					int socks_session_id = ChainedListNew (&socks_session_list, (void **)&socks_session,
+						sizeof(ITEM_SOCKS_SESSION));
+					socks_session->id_prev = porc_command_open_socks_content->socks_session_id;
+					socks_session->client_porc_session = porc_session_id;
+					socks_session->target_socket_descriptor = target_socket_descriptor;
+					ChainedListComplete (&socks_session_list, socks_session_id);
 				}
-				printf("Connection to host established\n");
-				// Recode the socks session
-				ITEM_SOCKS_SESSION *socks_session;
-				int socks_session_id = ChainedListNew (&socks_session_list, (void **)&socks_session,
-					sizeof(ITEM_SOCKS_SESSION));
-				socks_session->id_prev = porc_command_open_socks_content->socks_session_id;
-				socks_session->client_porc_session = porc_session_id;
-				socks_session->target_socket_descriptor = target_socket_descriptor;
-				ChainedListComplete (&socks_session_list, socks_session_id);
+
 				// Send acknowledgment back to client
-				PORC_RESPONSE_OPEN_SOCKS_CONTENT porc_response_open_socks_content;
-				porc_response_open_socks_content.status = PORC_STATUS_SUCCESS;
-				porc_response_open_socks_content.socks_session_id = socks_session->id_prev;
-				if (relay_porc_send (PORC_RESPONSE_OPEN_SOCKS, porc_session->id_prev, (char *)&porc_response_open_socks_content,
+				if (relay_porc_send (PORC_RESPONSE_OPEN_SOCKS, porc_command_open_socks_content->socks_session_id,
+					(char *)&porc_response_open_socks_content,
 					sizeof(porc_response_open_socks_content)) != 0)
 				{
 					fprintf (stderr, "Error sending ack for socks session opening(router)\n");
@@ -277,10 +295,6 @@ int process_porc_packet(int tls_session_id) {
 				}
 
 				printf ("Ack sent for open socks\n");
-				
-				
-				
-				
 
 			} else if (porc_payload_header->code == PORC_COMMAND_ASK_KEY) {
 
