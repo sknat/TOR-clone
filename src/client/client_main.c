@@ -589,30 +589,6 @@ int client_circuit_free () {
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 //The proxy method to be runned in a thread
 void *start_proxy(void *arg){
 	return ((void *)proxy_socksv4 ((int)arg));
@@ -640,7 +616,7 @@ int main () {
 	}
 
 	// Set up the connection to the PORC network
-	if (client_circuit_init (4) != 0) {
+	if (client_circuit_init (PORC_TUNNEL_RELAY_NUM) != 0) {
 		fprintf (stderr, "Error in circuit initialisation\n");
 		gnutls_certificate_free_credentials (xcred);
 		gnutls_global_deinit ();
