@@ -9,16 +9,15 @@
 #include <time.h>
 #include <signal.h>
 #include <sys/types.h>
-
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 
-#include "config.h"
-#include "mytcp.h"
-#include "mytls.h"
-#include "clientmain.h"
+#include "../config.h"
+
+#include "tcp.h"
+#include "tls.h"
 
 
 extern int nbr_relays;
@@ -179,13 +178,7 @@ typedef struct {
 /*
 	gnutls_global_init must have been called prior to thiese functions
 */
-extern int client_circuit_init (int circuit_length);
-extern int client_circuit_free ();
 
-extern int client_porc_send (PORC_COMMAND command, char *payload, size_t payload_length);
-extern int client_porc_recv (PORC_RESPONSE *porc_response, char **payload, size_t *payload_length);
-extern int set_symmetric_key (char **key_crypted, int *key_crypted_length, char *public_key, int public_key_length, 
-int relay_index);
 
 
 #endif

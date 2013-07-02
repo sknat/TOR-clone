@@ -6,8 +6,7 @@
 #ifndef PORC_SELECT
 #define PORC_SELECT
 
-#include "clientmain.h"
-
+#include "client_main.h"
 
 int do_proxy();
 

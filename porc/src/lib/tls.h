@@ -8,7 +8,7 @@
 #include <gnutls/gnutls.h>
 #include <netinet/in.h>
 
-#define MAX_BUF 1024
+#include "../config.h"
 
 /*
 	xcred : global credentials structure.

@@ -18,12 +18,12 @@
 
 #include <gcrypt.h>
 
-#include "config.h"
-#include "mytcp.h"
-#include "mytls.h"
-#include "chainedlist.h"
-#include "signaling.h"
-#include "porc.h"
+#include "../config.h"
+#include "../lib/tcp.h"
+#include "../lib/tls.h"
+#include "../lib/chained_list.h"
+#include "../lib/signaling.h"
+#include "../lib/porc_protocol.h"
 
 
 

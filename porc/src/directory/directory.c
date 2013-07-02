@@ -19,11 +19,11 @@
 #include <fcntl.h>
 #include <errno.h>
 
-#include "config.h"
-#include "mytls.h"
-#include "mytcp.h"
-#include "porc.h"
 
+#include "../lib/tls.h"
+#include "../lib/tcp.h"
+#include "../lib/porc_protocol.h"
+#include "../config.h"
 
 static gnutls_priority_t priority_cache;
 static struct sockaddr_in sockaddr_server;

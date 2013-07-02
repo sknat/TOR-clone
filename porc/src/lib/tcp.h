@@ -5,7 +5,7 @@
 #ifndef MYTCP
 #define MYTCP
 
-#include "config.h"
+#include "../config.h"
 
 typedef struct MYSOCKET {
 	uint32_t	ip;

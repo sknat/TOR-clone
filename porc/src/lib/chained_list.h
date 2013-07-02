@@ -1,6 +1,10 @@
-/*
-	chainedlist - Chained lists for the PORC project.
-*/
+// ################################################################################
+//
+//		Chained List Implementation
+//
+//	A Generic structure with several Items used in the project
+//
+// ################################################################################
 
 #ifndef PORC_CHAINED_LIST
 #define PORC_CHAINED_LIST
@@ -10,22 +14,27 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <gcrypt.h>
-#include "config.h"
 
+#include "../config.h"
 
+//////////////////////////////////////////////////////////////////////////////
+//				Different ITEMS to be contained in Lists					//
+//////////////////////////////////////////////////////////////////////////////
+
+// ITEM_CLIENT :
 typedef struct
 {
 	int client_socket_descriptor;	// SOCKS client socket descriptor
 } 	ITEM_CLIENT;
 
-
+// ITEM_TLS_SESSION : represents the data relative to a TLS session
 typedef struct
 {
 	int socket_descriptor;
 	gnutls_session_t gnutls_session;
 } 	ITEM_TLS_SESSION;
 
-
+//ITEM_PORC_SESSION : represents the data relative to a PORC session
 typedef struct
 {
 	int id_prev;			// PORC client's id for the PORC session
@@ -35,11 +44,7 @@ typedef struct
 	int server_tls_session;
 } 	ITEM_PORC_SESSION;
 
-
-#define SOCKS_TO_TARGET		105
-#define SOCKS_TO_RELAY		155
-
-// id is the local SOCKS session id
+// ITEM_SOCKS_SESSION : represents the data relative to a SOCKS session
 typedef struct
 {
 	int id_prev;			// PORC client's id for the SOCKS session
@@ -48,8 +53,12 @@ typedef struct
 } 	ITEM_SOCKS_SESSION;
 
 
+//////////////////////////////////////////////////////////////////////////////
+//						Raw List Types & Functions							//
+//////////////////////////////////////////////////////////////////////////////
 
 
+// CHAINED_LIST_LINK : a raw item container in the chained list
 typedef struct CHAINED_LIST_LINK
 {
 	int id;
@@ -58,6 +67,7 @@ typedef struct CHAINED_LIST_LINK
 	struct CHAINED_LIST_LINK *nxt;
 } 	CHAINED_LIST_LINK;
 
+// CHAINED_LIST : the raw list type
 typedef struct
 {
 	int index;		// >= max(ids) + 1
@@ -65,25 +75,13 @@ typedef struct
 	CHAINED_LIST_LINK *first;
 }	CHAINED_LIST;
 
-
-
 void ChainedListInit (CHAINED_LIST* p);
-
 int ChainedListRemove (CHAINED_LIST* p, int id);
-
 int ChainedListFind (CHAINED_LIST* p, int id, void **item);
-
 int ChainedListComplete (CHAINED_LIST* p, int id);
-
-/*
-	A new link is allocated and a pointer to its content is given.
-*/
 int ChainedListNew (CHAINED_LIST *p, void **item, int item_size);
-
 int ChainedListNext (CHAINED_LIST_LINK **p, void **item);
-
 void ChainedListClear (CHAINED_LIST *p);
-
 
 #endif
 

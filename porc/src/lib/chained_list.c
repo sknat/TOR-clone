@@ -1,7 +1,13 @@
-#include "chainedlist.h"
+// ################################################################################
+//	Chained List Implementation
+//
+//	A Generic structure with several Items used in the project
+//
+// ################################################################################
 
+#include "chained_list.h"
 
-
+//Initialisation of a Generic List
 void ChainedListInit (CHAINED_LIST* p)
 {
 	p->index = 0;
@@ -9,6 +15,7 @@ void ChainedListInit (CHAINED_LIST* p)
 	p->first = NULL;
 }
 
+//Remove Element of id given in list
 int ChainedListRemove (CHAINED_LIST* p, int id)
 {
 	CHAINED_LIST_LINK* c = p->first;
@@ -39,7 +46,7 @@ int ChainedListRemove (CHAINED_LIST* p, int id)
 	return -1;
 }
 
-
+//Return the item of id given as argument
 int ChainedListFind (CHAINED_LIST* p, int id, void **item) 
 {
 	CHAINED_LIST_LINK* c = p->first;
@@ -55,6 +62,7 @@ int ChainedListFind (CHAINED_LIST* p, int id, void **item)
 	return -1;
 }
 
+//Set the flag 'complete' of the item id to true. It can know be read with ChainListFind
 int ChainedListComplete (CHAINED_LIST* p, int id) {
 	CHAINED_LIST_LINK* c = p->first;
 	while(c)
@@ -69,6 +77,8 @@ int ChainedListComplete (CHAINED_LIST* p, int id) {
 	return -1;
 }
 
+//Creates a new element at the top of list p
+//It returns a pointer (**item) on the created item
 int ChainedListNew (CHAINED_LIST *p, void **item, int item_size)
 {
 	CHAINED_LIST_LINK* el = malloc(sizeof(CHAINED_LIST_LINK));
@@ -92,6 +102,7 @@ int ChainedListNew (CHAINED_LIST *p, void **item, int item_size)
 	return el->id;
 }
 
+//Next item in list
 int ChainedListNext (CHAINED_LIST_LINK **p, void **item) {
 	if ((*p)->nxt != NULL) {
 		*p = (*p)->nxt;
@@ -102,7 +113,7 @@ int ChainedListNext (CHAINED_LIST_LINK **p, void **item) {
 	return -1;
 }
 
-
+//Clears the list
 void ChainedListClear (CHAINED_LIST *p)
 {
 	CHAINED_LIST_LINK* c;

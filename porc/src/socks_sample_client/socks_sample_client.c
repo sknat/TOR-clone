@@ -9,8 +9,9 @@
 #include <stdio.h>
 #include <strings.h>
 #include <unistd.h>
-#include "socksproto.h"
-#include "config.h"
+
+#include "../lib/socks.h"
+#include "../config.h"
 
 
 int main(int argc, char**argv)

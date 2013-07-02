@@ -1,50 +1,62 @@
-CC	= gcc
+
+
+BINS	  =	relay/relay_main.bin 							\
+			client/client_main.bin 							\
+			socks_sample_client/socks_sample_client.bin 	\
+			directory/directory.bin 						\
+			set_dir_utility/set_dir_utility.bin
+			
+CC        = gcc
 CFLAGS	= -O0 -Wall $(INCLUDE) `pkg-config gnutls --cflags` `libgcrypt-config --cflags`
 LIBS	= `pkg-config gnutls --libs` `libgcrypt-config --libs`
+DIRS := ${shell find src/ -type d -print}
+SRC       = $(foreach dir,$(DIRS),$(wildcard $(dir)/*.c))
+OBJ       = $(patsubst src/%.c,build/%.o,$(SRC))
+RBINS 	  =	$(foreach bin,$(BINS),build/$(bin))
+	
+%client_main.bin: 	build/client/select.o build/lib/tls.o \
+					build/lib/socks.o build/lib/tcp.o build/lib/chained_list.o  \
+					build/lib/signaling.o build/client/client_main.o
+	@echo "--------------------------------------------------------------------------------"
+	@echo [link]
+	$(CC) -o $@ $^ $(LIBS) -lpthread
 
-SRC	=	signaling.c porc.c relay.c relaymain.c clientmain.c select.c sclient.c mytls.c socks.c mytcp.c directory.c setdir.c chainedlist.c
-OBJ	=	signaling.o porc.o relay.o relaymain.o clientmain.o select.o sclient.o mytls.o socks.o mytcp.o directory.o setdir.o chainedlist.o
-BINS	=	relay.exe client.exe sclient.exe directory.exe setdir.exe
+%directory.bin: build/directory/directory.o build/lib/tls.o build/lib/tcp.o
+	@echo "--------------------------------------------------------------------------------"
+	@echo [link]
+	$(CC) -o $@ $^ $(LIBS) -lpthread
 
-all:	$(BINS)
-	@echo "    $(BINS)"
+%relay_main.bin: 	build/relay/relay_main.o build/lib/tls.o build/lib/tcp.o 	\
+					build/lib/chained_list.o build/lib/signaling.o
+	@echo "--------------------------------------------------------------------------------"
+	@echo [link]
+	$(CC) -o $@ $^ $(LIBS) -lpthread
+	
+%socks_sample_client.bin: build/socks_sample_client/socks_sample_client.o
+	@echo "--------------------------------------------------------------------------------"
+	@echo [link]
+	$(CC) -o $@ $^ $(LIBS) -lpthread
+	
+%set_dir_utility.bin: build/set_dir_utility/set_dir_utility.o
+	@echo "--------------------------------------------------------------------------------"
+	@echo [link]
+	$(CC) -o $@ $^ $(LIBS) -lpthread
+
+all: mkdir $(RBINS)
+	@echo "$(RBINS)"
 	@echo ""
-
-setdir.exe:	setdir.o
-	@echo "--------------------------------------------------------------------------------"
-	@echo [link]
-	$(CC) -o $@ setdir.o $(LIBS)
-
-relay.exe:	relaymain.o mytls.o mytcp.o chainedlist.o signaling.o
-	@echo "--------------------------------------------------------------------------------"
-	@echo [link]
-	$(CC) -o $@ relaymain.o mytls.o mytcp.o chainedlist.o signaling.o $(LIBS) -lpthread
-	cp relay.exe ./relay01/relay.exe
-	cp relay.exe ./relay02/relay.exe
-	cp relay.exe ./relay03/relay.exe
-	cp relay.exe ./relay04/relay.exe
 	
-directory.exe:	directory.o mytls.o mytcp.o
-	@echo "--------------------------------------------------------------------------------"
-	@echo [link]
-	$(CC) -o $@ directory.o mytls.o mytcp.o $(LIBS) -lpthread
-	cp directory.exe ./directory/directory.exe
-
-client.exe:	clientmain.o select.o mytls.o socks.o mytcp.o chainedlist.o porc.o signaling.o
-	@echo "--------------------------------------------------------------------------------"
-	@echo [link]
-	$(CC) -o $@ clientmain.o select.o mytls.o socks.o mytcp.o chainedlist.o porc.o signaling.o  $(LIBS) -lpthread
-	cp client.exe ./client/client.exe
+checkdirs: 
+	@echo $(OBJ)
 	
-sclient.exe:	sclient.o
-	@echo "--------------------------------------------------------------------------------"
-	@echo [link]
-	$(CC) -o $@ sclient.o $(LIBS)
-
-.c.o:
+build/%.o: src/%.c 
 	@echo "--------------------------------------------------------------------------------"
 	@echo [CC] $<
-	@$(CC) -c $(CFLAGS) $< -o $@
+	$(CC) -c $(CFLAGS) $< -o $@ 
 
+mkdir: 
+	mkdir -p $(patsubst src/%,build/%,$(DIRS))
+	
 clean:
-	rm -f $(OBJ) *~ $(BINS) ./*.stackdump ./*/*.stackdump ./*/*.exe
+	rm -f $(RBINS)
+

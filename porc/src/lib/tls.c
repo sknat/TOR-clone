@@ -7,8 +7,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 
-#include "config.h"
-#include "mytls.h"
+#include "tls.h"
 
 /*
 	_verify_certificate_callback - Checks the validity of the certificate during the TLS handshake.

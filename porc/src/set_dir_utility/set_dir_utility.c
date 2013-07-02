@@ -12,8 +12,9 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include "config.h"
-#include "mytcp.h"
+
+#include "../config.h"
+#include "../lib/tcp.h"
 
 int main() {
 	unsigned int nbr, port;

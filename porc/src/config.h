@@ -9,7 +9,7 @@
 #define KEY_FILE	"./key"
 #define ROOT_CA_FILE	"./root-ca.pem"
 #define FILE_LIST_RELAYS	"./listrelays"
-#define PATH_LIST_RELAYS	"./directory/listrelays"
+#define PATH_LIST_RELAYS	"../directory/listrelays"
 
 #define CLIENT_PORT	5558
 #define CLIENT_IP	"127.0.0.1"

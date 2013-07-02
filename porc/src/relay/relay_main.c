@@ -5,7 +5,7 @@
 //
 // ################################################################################
 
-#include "relaymain.h"
+#include "relay_main.h"
 
 static gnutls_priority_t priority_cache;
 

@@ -10,7 +10,7 @@
 #include <netinet/in.h>
 #include <netdb.h>
 
-#include "mytcp.h"
+#include "tcp.h"
 
 int connect_to_host(uint32_t ip, uint16_t port) {
 	printf ("Connecting to host\n");

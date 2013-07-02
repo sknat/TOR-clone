@@ -1,10 +1,11 @@
 /*
-	socketproto - Definitions about the SOCKSv4 protocol.
+	socks - SOCKSv4 module / PORC client accepting thread
 */
 
+#ifndef PORC_ACCEPT
+#define PORC_ACCEPT
 
-#ifndef SOCKS_PROTO
-#define SOCKS_PROTO
+#include "../client/client_main.h"
 
 /* Command constants */
 #define CMD_CONNECT 1
@@ -40,6 +41,17 @@ typedef struct SOCKS4Response {
 	uint16_t rsv1;
 	uint32_t rsv2;
 } __attribute__((packed)) SOCKS4Response;
+
+
+
+/*
+	proxy_socksv4 - Starts a SOCKSv4 proxy that sets up connections.
+
+	When a new client comes, proxy_socksv4 initializes the connection and signal it to the selecting thread.
+*/
+int proxy_socksv4 (int port);
+
+
 
 #endif
 
