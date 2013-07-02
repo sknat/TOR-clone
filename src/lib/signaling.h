@@ -1,3 +1,9 @@
+/* ################################################################################
+					
+			Lirary to send an interruption to every running programm
+					
+   ################################################################################*/
+
 #ifndef PORC_SIGNALING
 #define PORC_SIGNALING
 

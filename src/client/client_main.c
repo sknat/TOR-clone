@@ -1,3 +1,10 @@
+/* ################################################################################
+							Client - PORC client
+
+	The PORC client transfers a socks stream to a PORC circuit to the target.
+
+   ################################################################################*/
+
 #include "client_main.h"
 
 pthread_t accepting_thread; // ACCEPT thread
@@ -206,21 +213,15 @@ int set_symmetric_key (char **key_crypted, int *key_crypted_length, char *public
 }
 
 
-int client_circuit_init (int circuit_length) {
+///////////////////////////////////////////////////////////////////////////////
+//	
+//			 Ask for the relay list to the PORC directory
+//	
+///////////////////////////////////////////////////////////////////////////////
+int client_directory_create_list()
+{
 	int directory_socket_descriptor;
 	gnutls_session_t directory_gnutls_session;
-
-	if (circuit_length > MAX_CIRCUIT_LENGTH) {
-		fprintf (stderr, "Error in circuit length\n");
-		return -1;
-	}
-
-	///////////////////////////////////////////////////////////////////////////////
-	
-	//			 Ask for the relay list to the PORC directory
-	
-	///////////////////////////////////////////////////////////////////////////////
-
 	DIRECTORY_REQUEST directory_request;
 	DIRECTORY_RESPONSE directory_response;
 
@@ -279,20 +280,15 @@ int client_circuit_init (int circuit_length) {
 	close (directory_socket_descriptor);
 	gnutls_deinit(directory_gnutls_session);
 	printf ("Received %d trusted relays.\n", nbr_relays);
+	return 0;
+}
 
-
-	///////////////////////////////////////////////////////////////////////////////
-	
-	//							Creating the circuit
-	
-	///////////////////////////////////////////////////////////////////////////////
-
+int open_porc_with_first_relay()
+{
 	// Select a random relay
 	int r;
 	//gcry_randomize(&r,4,GCRY_STRONG_RANDOM);
 	r = 0;//r % nbr_relays;		
-
-	client_circuit.length = 0;
 
 	// Connect with tls to this relay
 	if (mytls_client_session_init (list_relays[r].ip, list_relays[r].port,
@@ -301,8 +297,10 @@ int client_circuit_init (int circuit_length) {
 		fprintf (stderr, "Error joining relay[0]\n");
 		return -1;
 	}
-
-	// Make PORC handshake
+	
+	///////////////////////////
+	//  Make PORC handshake  //
+	///////////////////////////
 
 	// Ask for public key
 	PORC_HANDSHAKE_REQUEST porc_handshake_request;
@@ -381,107 +379,145 @@ int client_circuit_init (int circuit_length) {
 		fprintf (stderr, "Router[0] returned Error as ACK\n");
 		return -1;
 	}
-	client_circuit.length++;
+	return 0;
+}
 
+int open_porc_with_next_relay(int relay_id)
+{
 	PORC_RESPONSE response;
 	size_t response_length;
-	int router_index;
-	for (router_index=1; router_index<circuit_length; router_index++)
+	// Select a random relay
+	int r;
+	//gcry_randomize(&r,4,GCRY_STRONG_RANDOM);
+	r = relay_id;//r % nbr_relays;		
+
+	// Ask for public key of next node
+	printf ("Ask for public key\n");
+	PORC_COMMAND_ASK_KEY_CONTENT porc_command_ask_key_content;
+	porc_command_ask_key_content.ip = htonl(list_relays[r].ip);
+	porc_command_ask_key_content.port = htons(list_relays[r].port);
+	printf ("request key for (ip, port) = (%08x, %i)\n", porc_command_ask_key_content.ip, porc_command_ask_key_content.port);
+	if (client_porc_send (PORC_COMMAND_ASK_KEY, (char *)&porc_command_ask_key_content, sizeof (porc_command_ask_key_content)) != 0) 
 	{
-		// Select a random relay
-		int r;
-		//gcry_randomize(&r,4,GCRY_STRONG_RANDOM);
-		r = router_index;//r % nbr_relays;		
+		return -1;	
+	}
 
-		// Ask for public key of next node
-		printf ("Ask for public key\n");
-		PORC_COMMAND_ASK_KEY_CONTENT porc_command_ask_key_content;
-		porc_command_ask_key_content.ip = htonl(list_relays[r].ip);
-		porc_command_ask_key_content.port = htons(list_relays[r].port);
-		printf ("request key for (ip, port) = (%08x, %i)\n", porc_command_ask_key_content.ip, porc_command_ask_key_content.port);
-		if (client_porc_send (PORC_COMMAND_ASK_KEY, (char *)&porc_command_ask_key_content, sizeof (porc_command_ask_key_content)) != 0) 
-		{
-			return -1;	
-		}
+	// Wait for Public key
+	printf ("Wait for public key\n");
+	PORC_RESPONSE_ASK_KEY_CONTENT *porc_response_ask_key_content;
+	if (client_porc_recv (&response, (char **)&porc_response_ask_key_content, &response_length) != 0)
+	{
+		fprintf (stderr, "Error recieving public key from Router[%i]\n",relay_id);
+		return -1;	
+	}
+	if (response != PORC_RESPONSE_ASK_KEY)
+	{
+		fprintf (stderr, "Error recieving public key from Router[%i] : wrong response\n",relay_id);
+		return -1;	
+	}
+	if (response_length < sizeof(PORC_RESPONSE_ASK_KEY_CONTENT))
+	{
+		fprintf (stderr, "Error recieving public key from Router[%i] : too short\n",relay_id);
+		return -1;	
+	}
+	if (porc_response_ask_key_content->status != PORC_STATUS_SUCCESS)
+	{
+		fprintf (stderr, "Router[%i] returned Error when asked for public key\n",relay_id);
+		return -1;
+	}
+	if ((porc_response_ask_key_content->ip != porc_command_ask_key_content.ip) ||
+		(porc_response_ask_key_content->port != porc_command_ask_key_content.port))
+	{
+		fprintf (stderr, "Wrong ip or port\n");
+	}
+	printf("public key received\n");
 
-		// Wait for Public key
-		printf ("Wait for public key\n");
-		PORC_RESPONSE_ASK_KEY_CONTENT *porc_response_ask_key_content;
-		if (client_porc_recv (&response, (char **)&porc_response_ask_key_content, &response_length) != 0)
-		{
-			fprintf (stderr, "Error recieving public key from Router[%i]\n",router_index);
-			return -1;	
-		}
-		if (response != PORC_RESPONSE_ASK_KEY)
-		{
-			fprintf (stderr, "Error recieving public key from Router[%i] : wrong response\n",router_index);
-			return -1;	
-		}
-		if (response_length < sizeof(PORC_RESPONSE_ASK_KEY_CONTENT))
-		{
-			fprintf (stderr, "Error recieving public key from Router[%i] : too short\n",router_index);
-			return -1;	
-		}
-		if (porc_response_ask_key_content->status != PORC_STATUS_SUCCESS)
-		{
-			fprintf (stderr, "Router[%i] returned Error when asked for public key\n",router_index);
-			return -1;
-		}
-		if ((porc_response_ask_key_content->ip != porc_command_ask_key_content.ip) ||
-			(porc_response_ask_key_content->port != porc_command_ask_key_content.port))
-		{
-			fprintf (stderr, "Wrong ip or port\n");
-		}
-		printf("public key received\n");
+	char *key_crypted;
+	int key_crypted_length;
+	if (set_symmetric_key (&key_crypted, &key_crypted_length,
+		(char *)porc_response_ask_key_content+sizeof(PORC_RESPONSE_ASK_KEY_CONTENT),
+		response_length-sizeof(PORC_RESPONSE_ASK_KEY_CONTENT), relay_id))
+	{
+		fprintf (stderr, "Error setting a key for Router[%i]\n", relay_id);
+		return -1;
+	}
+	free(porc_response_ask_key_content);
 
-		if (set_symmetric_key (&key_crypted, &key_crypted_length,
-			(char *)porc_response_ask_key_content+sizeof(PORC_RESPONSE_ASK_KEY_CONTENT),
-			response_length-sizeof(PORC_RESPONSE_ASK_KEY_CONTENT), router_index))
-		{
-			fprintf (stderr, "Error setting a key for Router[%i]\n", router_index);
-			return -1;
-		}
-		free(porc_response_ask_key_content);
+	// Send the crypted symmetric key
+	printf ("Send the sym key\n");
+	char *porc_command_open_porc = malloc(sizeof(PORC_COMMAND_OPEN_PORC_HEADER)+key_crypted_length);
+	PORC_COMMAND_OPEN_PORC_HEADER *porc_command_open_porc_header = (PORC_COMMAND_OPEN_PORC_HEADER *)porc_command_open_porc;
+	porc_command_open_porc_header->ip = porc_command_ask_key_content.ip;
+	porc_command_open_porc_header->port = porc_command_ask_key_content.port;
+	memcpy (porc_command_open_porc+sizeof(PORC_COMMAND_OPEN_PORC_HEADER), key_crypted, key_crypted_length);
+	free (key_crypted);
+	printf ("ip, port : %08x, %04x\n", porc_command_open_porc_header->ip, porc_command_open_porc_header->port);
+	printf ("First payload bytes : %08x,%08x,%08x,%08x\n", *(int *)(porc_command_open_porc+0), *(int *)(porc_command_open_porc+4),
+		*(int *)(porc_command_open_porc+8), *(int *)(porc_command_open_porc+12));
+	if (client_porc_send (PORC_COMMAND_OPEN_PORC, (char *)porc_command_open_porc,
+		sizeof(PORC_COMMAND_OPEN_PORC_HEADER)+key_crypted_length) != 0)
+	{
+		return -1;	
+	}
+	free (porc_command_open_porc);
 
-		// Send the crypted symmetric key
-		printf ("Send the sym key\n");
-		char *porc_command_open_porc = malloc(sizeof(PORC_COMMAND_OPEN_PORC_HEADER)+key_crypted_length);
-		PORC_COMMAND_OPEN_PORC_HEADER *porc_command_open_porc_header = (PORC_COMMAND_OPEN_PORC_HEADER *)porc_command_open_porc;
-		porc_command_open_porc_header->ip = porc_command_ask_key_content.ip;
-		porc_command_open_porc_header->port = porc_command_ask_key_content.port;
-		memcpy (porc_command_open_porc+sizeof(PORC_COMMAND_OPEN_PORC_HEADER), key_crypted, key_crypted_length);
-		free (key_crypted);
-		printf ("ip, port : %08x, %04x\n", porc_command_open_porc_header->ip, porc_command_open_porc_header->port);
-		printf ("First payload bytes : %08x,%08x,%08x,%08x\n", *(int *)(porc_command_open_porc+0), *(int *)(porc_command_open_porc+4),
-			*(int *)(porc_command_open_porc+8), *(int *)(porc_command_open_porc+12));
-		if (client_porc_send (PORC_COMMAND_OPEN_PORC, (char *)porc_command_open_porc,
-			sizeof(PORC_COMMAND_OPEN_PORC_HEADER)+key_crypted_length) != 0)
-		{
-			return -1;	
-		}
-		free (porc_command_open_porc);
+	// Wait for an acknowlegdment
+	printf ("Wait for ack\n");
+	PORC_RESPONSE_OPEN_PORC_CONTENT *porc_response_open_porc_content;
+	if (client_porc_recv (&response, (char **)&porc_response_open_porc_content, &response_length) != 0)
+	{
+		fprintf (stderr, "Error during acknowledgment from Router[%i]\n",relay_id);
+		return -1;	
+	}
+	if (response != PORC_RESPONSE_OPEN_PORC)
+	{
+		fprintf (stderr, "Error during acknowledgment from Router[%i] : wrong response (2)\n",relay_id);
+		return -1;	
+	}
+	if (response_length < sizeof(PORC_RESPONSE_OPEN_PORC_CONTENT))
+	{
+		fprintf (stderr, "Error during acknowledgment from Router[%i] : too short\n",relay_id);
+		return -1;	
+	}
+	if (porc_response_open_porc_content->status != PORC_STATUS_SUCCESS)
+	{
+		fprintf (stderr, "Router[%i] returned Error as acknowledgment\n",relay_id);
+		return -1;
+	}
+	return 0;
+}
 
-		// Wait for an acknowlegdment
-		printf ("Wait for ack\n");
-		PORC_RESPONSE_OPEN_PORC_CONTENT *porc_response_open_porc_content;
-		if (client_porc_recv (&response, (char **)&porc_response_open_porc_content, &response_length) != 0)
+///////////////////////////////////////////////////////////////////////////////
+//
+//							Creates the Porc circuit
+//
+///////////////////////////////////////////////////////////////////////////////
+int client_circuit_init (int circuit_length) 
+{
+	client_circuit.length = 0;
+	if (circuit_length > MAX_CIRCUIT_LENGTH) 
+	{
+		fprintf (stderr, "Error in circuit length\n");
+		return -1;
+	}
+	if (client_directory_create_list()!=0)
+	{
+		fprintf (stderr, "Error while asking directory for relays\n");
+		return -1;
+	}
+	if (open_porc_with_first_relay()!=0)
+	{
+		fprintf (stderr, "Error while contacting first relay\n");
+		return -1;
+	}
+	printf ("--------------New relay %i---------\n", client_circuit.length);
+	client_circuit.length = 1;
+	int relay_id;
+	for (relay_id=1; relay_id<circuit_length; relay_id++)
+	{
+		if (open_porc_with_next_relay(relay_id)!=0)
 		{
-			fprintf (stderr, "Error during acknowledgment from Router[%i]\n",router_index);
-			return -1;	
-		}
-		if (response != PORC_RESPONSE_OPEN_PORC)
-		{
-			fprintf (stderr, "Error during acknowledgment from Router[%i] : wrong response (2)\n",router_index);
-			return -1;	
-		}
-		if (response_length < sizeof(PORC_RESPONSE_OPEN_PORC_CONTENT))
-		{
-			fprintf (stderr, "Error during acknowledgment from Router[%i] : too short\n",router_index);
-			return -1;	
-		}
-		if (porc_response_open_porc_content->status != PORC_STATUS_SUCCESS)
-		{
-			fprintf (stderr, "Router[%i] returned Error as acknowledgment\n",router_index);
+			fprintf (stderr, "Error while contacting relay[%i]\n",relay_id);
 			return -1;
 		}
 

@@ -1,7 +1,8 @@
+/* ################################################################################
 
-/*
 	sclient - Sample SOCKv4 client for testing purposes
-*/
+	
+   ################################################################################*/
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -10,7 +11,7 @@
 #include <strings.h>
 #include <unistd.h>
 
-#include "../lib/socks.h"
+#include "../lib/socks_protocol.h"
 #include "../config.h"
 
 

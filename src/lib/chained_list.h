@@ -1,10 +1,10 @@
-// ################################################################################
-//
-//		Chained List Implementation
-//
-//	A Generic structure with several Items used in the project
-//
-// ################################################################################
+/* ################################################################################
+
+						Chained List Implementation
+
+			A Generic structure with several Items used in Porc
+
+   ################################################################################*/
 
 #ifndef PORC_CHAINED_LIST
 #define PORC_CHAINED_LIST

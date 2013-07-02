@@ -1,7 +1,9 @@
-/*
-	mytls - gnutls encapsulation for the PORC project.
-*/
-
+/* ################################################################################
+					
+					TLS Utility library for the Porc protocol
+							(gnutls encapsulation)
+					
+   ################################################################################*/
 #ifndef MY_TLS
 #define MY_TLS
 

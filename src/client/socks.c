@@ -1,14 +1,19 @@
+/* ################################################################################
+
+				socks - SOCKSv4 module / PORC client accepting thread
+
+   ################################################################################*/
+
+
 #include "socks.h"
 
-/*
-	new_client - Initialize a SOCKS connection. This function is called once during the SOCKSv4 handshake.
-
-	client_socket_descriptor - SOCKS client socket descriptor
-	ip - target ip
-	port - target port
-
-	This function returns 0 in case of success and -1 otherwise.
-*/
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// new_client - Initialize a SOCKS connection. This function is called once during the SOCKSv4 handshake.
+// 		client_socket_descriptor - SOCKS client socket descriptor
+// 		ip - target ip
+// 		port - target port
+// This function returns 0 in case of success and -1 otherwise.
+////////////////////////////////////////////////////////////////////////////////////////////////////
 int new_client(int client_socket_descriptor, uint32_t ip, uint16_t port) {
 	printf("Creation of new socks client\n");
 	int socks_session_id;

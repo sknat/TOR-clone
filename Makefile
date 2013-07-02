@@ -14,9 +14,7 @@ SRC       = $(foreach dir,$(DIRS),$(wildcard $(dir)/*.c))
 OBJ       = $(patsubst src/%.c,build/%.o,$(SRC))
 RBINS 	  =	$(foreach bin,$(BINS),build/$(bin))
 	
-%client_main.bin: 	build/client/select.o build/lib/tls.o \
-					build/lib/socks.o build/lib/tcp.o build/lib/chained_list.o  \
-					build/lib/signaling.o build/client/client_main.o
+%client_main.bin: 	build/client/select.o build/lib/tls.o build/client/socks.o build/lib/tcp.o build/lib/chained_list.o build/lib/signaling.o build/client/client_main.o
 	@echo "--------------------------------------------------------------------------------"
 	@echo [link]
 	$(CC) -o $@ $^ $(LIBS) -lpthread
@@ -26,13 +24,12 @@ RBINS 	  =	$(foreach bin,$(BINS),build/$(bin))
 	@echo [link]
 	$(CC) -o $@ $^ $(LIBS) -lpthread
 
-%relay_main.bin: 	build/relay/relay_main.o build/lib/tls.o build/lib/tcp.o 	\
-					build/lib/chained_list.o build/lib/signaling.o
+%relay_main.bin: 	build/relay/relay_main.o build/lib/tls.o build/lib/tcp.o build/lib/chained_list.o build/lib/signaling.o build/relay/accept.o build/relay/select.o
 	@echo "--------------------------------------------------------------------------------"
 	@echo [link]
 	$(CC) -o $@ $^ $(LIBS) -lpthread
 	
-%socks_sample_client.bin: build/socks_sample_client/socks_sample_client.o
+%socks_sample_client.bin: 	build/socks_sample_client/socks_sample_client.o
 	@echo "--------------------------------------------------------------------------------"
 	@echo [link]
 	$(CC) -o $@ $^ $(LIBS) -lpthread
@@ -42,12 +39,13 @@ RBINS 	  =	$(foreach bin,$(BINS),build/$(bin))
 	@echo [link]
 	$(CC) -o $@ $^ $(LIBS) -lpthread
 
+
+	
+	
+	
 all: mkdir $(RBINS)
 	@echo "$(RBINS)"
 	@echo ""
-	
-checkdirs: 
-	@echo $(OBJ)
 	
 build/%.o: src/%.c 
 	@echo "--------------------------------------------------------------------------------"
@@ -58,5 +56,5 @@ mkdir:
 	mkdir -p $(patsubst src/%,build/%,$(DIRS))
 	
 clean:
-	rm -f $(RBINS)
+	rm -f $(RBINS) $(OBJ) 
 

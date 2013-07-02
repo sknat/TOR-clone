@@ -1,3 +1,11 @@
+/* ################################################################################
+
+								Relay - PORC relay
+
+		The PORC relay transfers a stream to another relay or to the target.
+
+   ################################################################################*/
+
 #ifndef PORC_RELAY_MAIN
 #define PORC_RELAY_MAIN
 
@@ -25,21 +33,21 @@
 #include "../lib/signaling.h"
 #include "../lib/porc_protocol.h"
 
+#include "select.h"
+#include "accept.h"
 
+gnutls_priority_t priority_cache;
 
-extern int nbr_relays;
-extern MYSOCKET *list_relays;
+pthread_t accepting_thread;
+pthread_t selecting_thread;
 
+gcry_sexp_t public_key; 
+gcry_sexp_t private_key;
 
+CHAINED_LIST tls_session_list;
+CHAINED_LIST porc_session_list;
+CHAINED_LIST socks_session_list;
 
-extern pthread_t accepting_thread;
-extern pthread_t selecting_thread;
-
-
-
-void signal_handler_interrupt (int);
-void signal_handler_newstream (int);
-
-
+int main (int argc, char **argv);
 
 #endif

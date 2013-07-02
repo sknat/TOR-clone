@@ -1,3 +1,10 @@
+/* ################################################################################
+					
+					TLS Utility library for the Porc protocol
+							(gnutls encapsulation)
+					
+   ################################################################################*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

@@ -1,6 +1,8 @@
-/*
-	setdir - sets the list of trusted relays and stores it in a file
-*/
+/* ################################################################################
+
+		Setdir - sets the list of trusted relays and stores it in a file							
+
+   ################################################################################*/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -53,6 +55,11 @@ int main() {
 		content[i].port = htons(port);
 	}
 
+	if (remove(PATH_LIST_RELAYS)!=0)
+	{
+		fprintf (stderr,"impossible to erase relay list\n");
+		return -1;
+	}
 	file = open (PATH_LIST_RELAYS, O_WRONLY | O_CREAT);
 	if (file == -1) {
 		fprintf (stderr, "Impossible to open \"%s\"\n", PATH_LIST_RELAYS);

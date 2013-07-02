@@ -1,3 +1,10 @@
+/* ################################################################################
+							Client - PORC client
+
+	The PORC client transfers a socks stream to a PORC circuit to the target.
+
+   ################################################################################*/
+
 #ifndef PORC_CLIENT_MAIN
 #define PORC_CLIENT_MAIN
 
@@ -16,13 +23,13 @@
 
 #include "../lib/tcp.h"
 #include "../lib/tls.h"
-#include "../lib/socks.h"
 #include "../lib/chained_list.h"
 #include "../lib/signaling.h"
 #include "../lib/porc_protocol.h"
 
 #include "../config.h"
 
+#include "socks.h"
 #include "select.h"
 
 extern CHAINED_LIST socks_session_list;

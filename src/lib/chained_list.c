@@ -1,9 +1,10 @@
-// ################################################################################
-//	Chained List Implementation
-//
-//	A Generic structure with several Items used in the project
-//
-// ################################################################################
+/* ################################################################################
+
+						Chained List Implementation
+
+			A Generic structure with several Items used in Porc
+
+   ################################################################################*/
 
 #include "chained_list.h"
 

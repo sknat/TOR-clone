@@ -1,6 +1,8 @@
-/*
-	mytcp - definitions concerning TCP shared by different modules
-*/
+/* ################################################################################
+					
+					TCP Utility library for the Porc protocol
+					
+   ################################################################################*/
 
 #ifndef MYTCP
 #define MYTCP

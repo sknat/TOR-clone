@@ -1,8 +1,10 @@
-/*
-	directory - PORC directory
+/* ################################################################################
 
-	The PORC directory maintains a list of available and trusted PORC relays.
-*/
+						Directory - PORC directory
+
+		The PORC directory maintains a list of available and trusted PORC relays.
+
+   ################################################################################*/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -149,6 +151,13 @@ int main (void)
 		fprintf (stderr, "Error in reading : %d bytes read instead of %d\n", ret, sizeof(MYSOCKET)*nbr_relays);
 		free (list_relays);
 		return -1;
+	}
+	int i;
+	for (i=0;i<nbr_relays;i++)
+	{
+		int ip = ((MYSOCKET*)list_relays)[i].ip;
+		printf("Relay[%i], ip=%d.%d.%d.%d, port=%i\n",i,(ip) & 0xFF,(ip>>8) & 0xFF,
+		(ip>>16) & 0xFF, (ip>>24) & 0xFF,ntohs(((MYSOCKET*)list_relays)[i].port));
 	}
 
 	close (file);

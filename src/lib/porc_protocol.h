@@ -1,5 +1,12 @@
-#ifndef PORC_H
-#define PORC_H
+/* ################################################################################
+					
+					Structures defining the Porc protocol
+					
+   ################################################################################*/
+
+
+#ifndef PORC_PROTOCOL_H
+#define PORC_PROTOCOL_H
 
 #include <pthread.h>
 #include <stdio.h>

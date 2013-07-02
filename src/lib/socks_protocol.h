@@ -1,11 +1,15 @@
-/*
-	socks - SOCKSv4 module / PORC client accepting thread
-*/
+/* ################################################################################
+					
+					Structures for the SOCKSv4 Protocol
+					
+   ################################################################################*/
 
-#ifndef PORC_ACCEPT
-#define PORC_ACCEPT
 
-#include "../client/client_main.h"
+#ifndef SOCKS_PROTOCOL_H
+#define SOCKS_PROTOCOL_H
+
+#include <stdint.h>
+
 
 /* Command constants */
 #define CMD_CONNECT 1
@@ -43,15 +47,4 @@ typedef struct SOCKS4Response {
 } __attribute__((packed)) SOCKS4Response;
 
 
-
-/*
-	proxy_socksv4 - Starts a SOCKSv4 proxy that sets up connections.
-
-	When a new client comes, proxy_socksv4 initializes the connection and signal it to the selecting thread.
-*/
-int proxy_socksv4 (int port);
-
-
-
 #endif
-
