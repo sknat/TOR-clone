@@ -1,6 +1,7 @@
 INF441
 ======
 
+test
 
 SECURITY:
 * a thread should be spawn before every blocking operation
