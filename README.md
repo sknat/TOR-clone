@@ -7,6 +7,13 @@ It behaves as a SOCKS proxy routing the packets thourgh an encrypted level. It t
 * In its current version, it lacks at the implementation of meeting points, allowing as well end users as content providers to stay anonymous.
 * A major issue is the certification of the network nodes. The safety of the whole network is based on the authority giving the list of the servers and their public keys. Anyone who can impersonnate this server could hypothetically take control over ones connection, something that Apple's messaging system has already experienced.
 
+Licence
+========
+This code is provided as is under the GPL3 licence.
+It should be only taken as a proof of concept.
+Original authors are Michel Blancard and Nathan Skrzyczak
+
+
 
 Principle
 =========
