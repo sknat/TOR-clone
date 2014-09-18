@@ -20,7 +20,7 @@ The cryptography is based on the RSA asymetric algorithm. The packets sent accro
 * C picks a random node sequence (N1) , (N2), (N3)
 * (C) --[Open a tunnel to N2].N1key--> (N1)
 * (C) --[[Open a tunnel to N3].N2key].N1key--> (N1) --[Open a tunnel to N3].N2key--> (N2)
-* (C) --[[[Retrieve www.website.com].N3key].N2key].N1key--> (N1) --[[Retrieve www.website.com].N3key].N2key--> (N2) --[Retrieve www.website.com].N3key--> (N3) --Retrieve www.website.com--> (Website.com)
+* (C) --[[[Retrieve website.com].N3key].N2key].N1key--> (N1) --[[Retrieve website.com].N3key].N2key--> (N2) --[Retrieve website.com].N3key--> (N3) --Retrieve website.com--> (Website.com)
 
 * (Website.com) --Website Content--> (N3) --[Website Content].N3key--> (N2) --[[Website Content].N3key].N2key--> (N1) --[[[Website Content].N3key].N2key].N1key--> (C)
 
