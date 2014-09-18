@@ -1,18 +1,17 @@
 Onion routing network
 =====================
-=====================
 
 This project is a basic implementation of a TOR-like proxy,
 It behaves as a SOCKS proxy routing the packets thourgh an encrypted level. It thus ensures anonymity and privacy of the communications.
 
 * In its current version, it lacks at the implementation of meeting points, allowing as well end users as content providers to stay anonymous.
-* A major issue is the certification of the network nodes. The safety of the whole network is based on the 
+* A major issue is the certification of the network nodes. The safety of the whole network is based on the authority giving the list of the servers and their public keys. Anyone who can impersonnate this server could hypothetically take control over ones connection, something that Apple's messaging system has already experienced.
 
 
 Principle
 =========
 
-Let's say your computer (C) want to access the internet anonymously and privatly. It will want to create a tunnel of let's say of three servers in which all its packets will go.
+Your computer (C) want to access the internet anonymously and privatly. It will want to create a tunnel of let's say three servers in which all its packets will go.
 
 The cryptography is based on the RSA asymetric algorithm. The packets sent accross a tunnel of servers will be encrypted successivly with all the public keys of the servers on its way, and each one of them will decrypt the packet on the way so that each one only knows the node before and after him and only the last hop knows its content.
 
@@ -38,7 +37,6 @@ SECURITY:
 * several porc sessions code
 
 TODO :
-* ajouter la license GPL2
 * treat endianness correctly
 * handle 'complete' field
 * handle ctrl+C
@@ -48,7 +46,7 @@ TODO :
 * send PORC_STATUS_FAILURE when failures occurs
 * converting sym key representation : issue when too small
 
-* Close PORC & SOCKS
+* Close ORN sessions & SOCKS
 * Client : accepting thread should only accept from listening socket
 (add these commands to client_process_porc_packet)
 
