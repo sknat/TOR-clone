@@ -1,5 +1,6 @@
 Onion routing network
 =====================
+=====================
 
 This project is a basic implementation of a TOR-like proxy,
 It behaves as a SOCKS proxy routing the packets thourgh an encrypted level. It thus ensures anonymity and privacy of the communications.
@@ -11,12 +12,17 @@ It behaves as a SOCKS proxy routing the packets thourgh an encrypted level. It t
 Principle
 =========
 
-Let's say your computer (C) want to access the internet anonymously and privatly. It will want to create a tunnel, let's say of three servers in which all its packets will go
+Let's say your computer (C) want to access the internet anonymously and privatly. It will want to create a tunnel of let's say of three servers in which all its packets will go.
 
-(C) ---> (certification authority) 
+The cryptography is based on the RSA asymetric algorithm. The packets sent accross a tunnel of servers will be encrypted successivly with all the public keys of the servers on its way, and each one of them will decrypt the packet on the way so that each one only knows the node before and after him and only the last hop knows its content.
 
+* (C) --Which are the available nodes?--> (certification authority)       
+* C picks a random node sequence (N1) , (N2), (N3)
+* (C) --[Open a tunnel to N2].N1key--> (N1)
+* (C) --[[Open a tunnel to N3].N2key].N1key--> (N1) --[Open a tunnel to N3].N2key--> (N2)
+* (C) --[[[Retrieve www.website.com].N3key].N2key].N1key--> (N1) --[[Retrieve www.website.com].N3key].N2key--> (N2) --[Retrieve www.website.com].N3key--> (N3) --Retrieve www.website.com--> (Website.com)
 
-
+* (Website.com) --Website Content--> (N3) --[Website Content].N3key--> (N2) --[[Website Content].N3key].N2key--> (N1) --[[[Website Content].N3key].N2key].N1key--> (C)
 
 
 
