@@ -11,7 +11,7 @@ Licence
 ========
 This code is provided as is under the GPL3 licence.
 It should be only taken as a proof of concept.
-Original authors are Michel Blancard and Nathan Skrzyczak
+Original authors are Michel Blancard and Nathan Skrzypczak
 
 
 
